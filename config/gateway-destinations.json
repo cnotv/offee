@@ -1,0 +1,10 @@
+[
+  {
+    "id": "anthropic",
+    "baseUrl": "https://api.anthropic.com",
+    "allowedPaths": ["/v1/messages"],
+    "forwardedHeaders": ["content-type", "anthropic-version", "anthropic-beta"],
+    "keyHeader": "x-api-key",
+    "keyEnvironmentVariable": "ANTHROPIC_API_KEY"
+  }
+]

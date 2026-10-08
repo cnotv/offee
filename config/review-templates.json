@@ -1,0 +1,22 @@
+[
+  {
+    "id": "meeting",
+    "name": "Meeting or talk",
+    "sections": ["Summary", "Decisions", "Action items with owners", "Open questions"]
+  },
+  {
+    "id": "performance",
+    "name": "Performance review",
+    "sections": ["Overview", "Strengths", "Areas to develop", "Goals for the next period"]
+  },
+  {
+    "id": "document",
+    "name": "Document review",
+    "sections": ["What it says", "What works", "Issues and risks", "Suggested changes"]
+  },
+  {
+    "id": "event",
+    "name": "Event or talk recap",
+    "sections": ["Key points", "Notable quotes", "Takeaways", "Follow-ups"]
+  }
+]
