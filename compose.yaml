@@ -1,0 +1,83 @@
+# Offee inside its VM. Only `edge` publishes a port, on 127.0.0.1; only `gateway` has a
+# network that leads outside, and it lets nothing through until the host opens the switch.
+# Nothing here mounts a host folder: images carry their files, volumes live inside the VM.
+name: offee
+
+x-hardened: &hardened
+  restart: unless-stopped
+  security_opt: ["no-new-privileges:true"]
+  cap_drop: [ALL]
+
+services:
+  edge:
+    <<: *hardened
+    build: { context: ., dockerfile: deploy/edge.Dockerfile }
+    image: offee/edge:local
+    ports: ["127.0.0.1:${OFFEE_PORT:-8470}:8470"]
+    networks: [internal, edge]
+    read_only: true
+    tmpfs: [/tmp, /var/cache/nginx]
+    cap_add: [SETUID, SETGID, CHOWN]
+    depends_on: [app]
+
+  app:
+    <<: *hardened
+    build: { context: ., dockerfile: deploy/app.Dockerfile }
+    image: offee/app:local
+    environment:
+      OFFEE_ALLOWED_HOSTS: localhost,127.0.0.1
+      OFFEE_REMOTE_MODEL: ${OFFEE_REMOTE_MODEL:-claude-opus-5-5}
+    volumes: [offee-data:/data]
+    networks: [internal]
+    read_only: true
+    tmpfs: [/tmp]
+
+  gateway:
+    <<: *hardened
+    image: offee/app:local
+    command: ["node", "apps/gateway/src/main.ts"]
+    environment:
+      # Read from the host's ~/.offee/keys by the launcher; never given to the app.
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    networks: [internal, egress]
+    read_only: true
+    tmpfs: ["/run/offee:uid=1000,gid=1000,mode=0700"]
+    depends_on: [app]
+
+  inference:
+    <<: *hardened
+    image: ${OFFEE_LLAMA_IMAGE:-ghcr.io/ggml-org/llama.cpp:server-b11459}
+    command:
+      - --offline
+      - -hf
+      - ${OFFEE_CHAT_MODEL:-ggml-org/gemma-4-E4B-it-GGUF}
+      - --no-mmproj
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8080"
+      - --ctx-size
+      - ${OFFEE_CONTEXT_SIZE:-16384}
+      - --jinja
+    environment:
+      LLAMA_CACHE: /models
+    volumes: [offee-models:/models]
+    networks: [internal]
+
+  transcription:
+    <<: *hardened
+    build: { context: ., dockerfile: deploy/transcription.Dockerfile }
+    image: offee/transcription:local
+    volumes: [offee-whisper:/models]
+    networks: [internal]
+
+networks:
+  internal:
+    internal: true
+  edge: {}
+  egress: {}
+
+volumes:
+  offee-data: { name: offee-data }
+  offee-models: { name: offee-models }
+  offee-whisper: { name: offee-whisper }

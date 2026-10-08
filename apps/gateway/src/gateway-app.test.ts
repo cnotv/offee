@@ -129,3 +129,23 @@ describe('forwarding', () => {
     expect(control('not json')).toEqual({ ok: false, error: 'Unknown command' })
   })
 })
+
+describe('an unreachable provider', () => {
+  it('answers 502 with a refusal that carries no request detail', async () => {
+    const app = createGatewayApp({
+      destinations: [anthropic],
+      readSwitch: () => openFor(10, 0),
+      approvals: createApprovalQueue({ now: () => 0, timeoutMilliseconds: 100 }),
+      send: async () => {
+        throw new Error('getaddrinfo ENOTFOUND api.anthropic.com with sk-real')
+      },
+      environment: { ANTHROPIC_API_KEY: 'sk-real' },
+      now: () => 0,
+    })
+    const response = await post(app)
+    expect(response.status).toBe(502)
+    const text = await response.text()
+    expect(text).toContain('"unreachable"')
+    expect(text).not.toContain('sk-real')
+  })
+})

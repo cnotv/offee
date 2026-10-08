@@ -94,16 +94,17 @@ export const createGatewayApp = (dependencies: GatewayDependencies): Hono => {
         return refuse({ refusal: 'unknown-destination', detail: 'That destination or path is not listed' })
       }
 
+      const decision = decideForward(currentState(dependencies.readSwitch(), dependencies.now()).mode)
+      if (decision === 'refuse') {
+        return refuse({ refusal: 'sealed', detail: 'The switch is sealed. Run: offee switch ask' })
+      }
+
       const key = dependencies.environment[destination.keyEnvironmentVariable]
       if (key === undefined || key.length === 0) {
         return refuse({ refusal: 'missing-key', detail: `No key is set for ${destination.id}. Run: offee key ${destination.id}` })
       }
 
       const body = await context.req.text()
-      const decision = decideForward(currentState(dependencies.readSwitch(), dependencies.now()).mode)
-      if (decision === 'refuse') {
-        return refuse({ refusal: 'sealed', detail: 'The switch is sealed. Run: offee switch ask' })
-      }
 
       const url = `${destination.baseUrl}${target.path}`
       if (decision === 'hold') {
@@ -117,12 +118,19 @@ export const createGatewayApp = (dependencies: GatewayDependencies): Hono => {
         if (outcome === 'timeout') return refuse({ refusal: 'timeout', detail: 'Nobody approved the request in time. Run: offee watch' })
       }
 
-      const sent = await dependencies.send({
-        url,
-        headers: { ...pickForwardedHeaders(destination, context.req.raw.headers), [destination.keyHeader]: key },
-        body,
-      })
-      return new Response(sent.body, { status: sent.status, headers: { 'content-type': sent.contentType } })
+      try {
+        const sent = await dependencies.send({
+          url,
+          headers: { ...pickForwardedHeaders(destination, context.req.raw.headers), [destination.keyHeader]: key },
+          body,
+        })
+        return new Response(sent.body, { status: sent.status, headers: { 'content-type': sent.contentType } })
+      } catch {
+        // The reason stays generic: a network error can echo request details, and the key
+        // must never travel back in an error.
+        const unreachable: GatewayRefusalBody = { refusal: 'unreachable', detail: `${destination.id} could not be reached from this machine` }
+        return context.json(unreachable, 502)
+      }
     },
   )
 

@@ -188,7 +188,7 @@ export type RunDetail = RunSummary & {
   outbound: OutboundRecord[]
 }
 
-export type GatewayRefusal = 'sealed' | 'denied' | 'timeout' | 'unknown-destination' | 'missing-key'
+export type GatewayRefusal = 'sealed' | 'denied' | 'timeout' | 'unknown-destination' | 'missing-key' | 'unreachable'
 
 export type GatewayRefusalBody = {
   refusal: GatewayRefusal

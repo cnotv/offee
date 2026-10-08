@@ -1,0 +1,5 @@
+# Local chat models Offee can use. Columns: Hugging Face repo[:quant], memory needed, notes.
+# `offee model use <repo>` switches; the model downloads during that command, then runs offline.
+ggml-org/gemma-4-E4B-it-GGUF	about 8 GB	Default. Gemma 4 E4B: fast, multilingual, good for most office work.
+ggml-org/gemma-4-E2B-it-GGUF	about 5 GB	Smaller and faster; weaker on long documents.
+ggml-org/gemma-4-26B-A4B-it-GGUF	about 20 GB	Much stronger; for Macs with 32 GB or more.

@@ -210,5 +210,8 @@ export const createApp = (dependencies: AppDependencies): Hono => {
     return run === undefined ? context.notFound() : context.json(run)
   })
 
+  // Anything else under /api is a mistake, not a page of the web app.
+  app.all('/api/*', (context) => context.json({ error: 'Not found' }, 404))
+
   return app
 }

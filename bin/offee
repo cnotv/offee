@@ -1,0 +1,344 @@
+#!/usr/bin/env bash
+# Offee's launcher: the only part that runs on the host. It starts the VM, builds and starts
+# the containers, holds the external-request switch, and never reads your files.
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+state_dir="${OFFEE_HOME:-$HOME/.offee}"
+settings_file="$state_dir/settings.env"
+keys_dir="$state_dir/keys"
+profile="offee"
+whisper_model_file="ggml-large-v3-turbo-q5_0.bin"
+whisper_model_url="https://huggingface.co/ggerganov/whisper.cpp/resolve/main/$whisper_model_file"
+default_chat_model="ggml-org/gemma-4-E4B-it-GGUF"
+llama_image="ghcr.io/ggml-org/llama.cpp:server-b11459"
+llama_vulkan_image="ghcr.io/ggml-org/llama.cpp:server-vulkan-b11459"
+
+bold() { printf '\033[1m%s\033[0m\n' "$*"; }
+info() { printf '  %s\n' "$*"; }
+fail() { printf '\033[31moffee: %s\033[0m\n' "$*" >&2; exit 1; }
+
+# OFFEE_RUNTIME=docker uses the Docker engine already running instead of a Colima VM. That is
+# container isolation only, meant for Linux hosts that already isolate Docker, and for tests.
+runtime="${OFFEE_RUNTIME:-colima}"
+
+load_settings() {
+  mkdir -p "$state_dir" "$keys_dir"
+  chmod 700 "$state_dir" "$keys_dir"
+  [ -f "$settings_file" ] || printf 'OFFEE_CHAT_MODEL=%s\nOFFEE_GPU=0\nOFFEE_PORT=8470\n' "$default_chat_model" > "$settings_file"
+  OFFEE_CHAT_MODEL="$(read_setting OFFEE_CHAT_MODEL "$default_chat_model")"
+  OFFEE_GPU="$(read_setting OFFEE_GPU 0)"
+  OFFEE_PORT="$(read_setting OFFEE_PORT 8470)"
+  export OFFEE_CHAT_MODEL OFFEE_PORT
+  export OFFEE_LLAMA_IMAGE="$llama_image" OFFEE_LLAMA_VULKAN_IMAGE="$llama_vulkan_image"
+}
+
+# Settings are read as plain key=value lines, never sourced, so the file cannot run code.
+read_setting() {
+  local value
+  value="$(grep -m1 "^$1=" "$settings_file" 2>/dev/null | cut -d= -f2- || true)"
+  printf '%s' "${value:-$2}"
+}
+
+save_setting() {
+  local key="$1" value="$2"
+  grep -v "^$key=" "$settings_file" > "$settings_file.tmp" || true
+  printf '%s=%s\n' "$key" "$value" >> "$settings_file.tmp"
+  mv "$settings_file.tmp" "$settings_file"
+}
+
+docker_cmd() {
+  if [ "$runtime" = "docker" ]; then docker "$@"; else docker --context "colima-$profile" "$@"; fi
+}
+
+compose() {
+  local files=(-f "$repo_root/compose.yaml")
+  [ "${OFFEE_GPU:-0}" = "1" ] && files+=(-f "$repo_root/compose.gpu.yaml")
+  # The key reaches the gateway container through its environment only, read fresh each time.
+  local key_file="$keys_dir/anthropic"
+  ANTHROPIC_API_KEY="$( [ -f "$key_file" ] && cat "$key_file" || true )" \
+    docker_cmd compose --project-directory "$repo_root" "${files[@]}" "$@"
+}
+
+gateway_ctl() {
+  local tty_flag=()
+  [ -t 0 ] && tty_flag=(-it)
+  docker_cmd exec "${tty_flag[@]}" offee-gateway-1 node apps/gateway/src/ctl.ts "$@"
+}
+
+confirm() {
+  [ "${OFFEE_YES:-0}" = "1" ] && return 0
+  local answer
+  read -r -p "$1 [y/N] " answer
+  [[ "$answer" =~ ^[Yy] ]]
+}
+
+require_command() { command -v "$1" >/dev/null 2>&1; }
+
+install_tools() {
+  local missing=()
+  require_command docker || missing+=(docker)
+  if [ "$runtime" = "colima" ]; then
+    require_command colima || missing+=(colima)
+    [ "${OFFEE_GPU:-0}" = "1" ] && ! require_command krunkit && missing+=(krunkit)
+  fi
+  if ! docker compose version >/dev/null 2>&1; then missing+=(docker-compose); fi
+  [ ${#missing[@]} -eq 0 ] && return 0
+
+  case "$(uname -s)" in
+    Darwin)
+      require_command brew || fail "Homebrew is needed to install ${missing[*]}: https://brew.sh"
+      confirm "Install ${missing[*]} with Homebrew?" || fail "Offee needs ${missing[*]}"
+      for tool in "${missing[@]}"; do
+        if [ "$tool" = "krunkit" ]; then brew tap slp/krunkit && brew install krunkit
+        else brew install "$tool"; fi
+      done
+      # Homebrew's compose is a separate binary; tell the Docker CLI where the plugin lives.
+      if ! docker compose version >/dev/null 2>&1; then
+        mkdir -p "$HOME/.docker/cli-plugins"
+        ln -sfn "$(brew --prefix)/opt/docker-compose/bin/docker-compose" "$HOME/.docker/cli-plugins/docker-compose"
+      fi
+      ;;
+    Linux)
+      fail "Install ${missing[*]} with your package manager (Colima: https://colima.run), then run offee setup again"
+      ;;
+    *) fail "Offee runs on macOS and Linux" ;;
+  esac
+}
+
+default_cpus() {
+  local cores
+  cores="$( (sysctl -n hw.ncpu 2>/dev/null || nproc) )"
+  echo $(( cores > 8 ? cores / 2 : (cores > 4 ? 4 : cores) ))
+}
+
+default_memory_gb() {
+  local total_gb
+  if [ "$(uname -s)" = "Darwin" ]; then total_gb=$(( $(sysctl -n hw.memsize) / 1073741824 ))
+  else total_gb=$(( $(awk '/MemTotal/ {print $2}' /proc/meminfo) / 1048576 )); fi
+  local half=$(( total_gb / 2 ))
+  echo $(( half < 8 ? 8 : (half > 24 ? 24 : half) ))
+}
+
+start_vm() {
+  [ "$runtime" = "docker" ] && return 0
+  if colima status --profile "$profile" >/dev/null 2>&1; then return 0; fi
+  if colima list 2>/dev/null | awk '{print $1}' | grep -qx "$profile"; then
+    colima start --profile "$profile"
+    return 0
+  fi
+  local vm_type="vz"
+  [ "$(uname -s)" = "Linux" ] && vm_type="qemu"
+  [ "${OFFEE_GPU:-0}" = "1" ] && vm_type="krunkit"
+  # One empty, read-only folder replaces Colima's default share of your home folder, so the
+  # VM sees nothing of the host.
+  mkdir -p "$state_dir/empty"
+  bold "Creating the Offee VM ($vm_type, ${cpus} CPUs, ${memory} GB)"
+  colima start --profile "$profile" --runtime docker --vm-type "$vm_type" \
+    --cpu "$cpus" --memory "$memory" --disk "${disk:-80}" \
+    --mount "$state_dir/empty"
+}
+
+wait_for_container_health() {
+  local name="$1" url="$2" attempts="${3:-720}"
+  for _ in $(seq 1 "$attempts"); do
+    if [ "$(docker_cmd inspect -f '{{.State.Running}}' "$name" 2>/dev/null)" != "true" ]; then
+      docker_cmd logs --tail 30 "$name" >&2 || true
+      return 1
+    fi
+    if docker_cmd run --rm --network offee-setup offee/transcription:local curl -sf "$url" >/dev/null 2>&1; then return 0; fi
+    printf '\r  %s' "$(docker_cmd logs --tail 1 "$name" 2>&1 | tr -d '\r' | cut -c1-100)"
+    sleep 5
+  done
+  return 1
+}
+
+pull_chat_model() {
+  local model="$1" image="$llama_image"
+  bold "Downloading the local model $model (this can take a while)"
+  docker_cmd pull "$image" >/dev/null
+  docker_cmd network create offee-setup >/dev/null 2>&1 || true
+  docker_cmd rm -f offee-model-pull >/dev/null 2>&1 || true
+  # llama.cpp fetches the model into the models volume, then serves it; once it answers, the
+  # model is cached and the sealed inference container can load it with --offline.
+  docker_cmd run -d --name offee-model-pull --network offee-setup -e LLAMA_CACHE=/models -v offee-models:/models \
+    "$image" -hf "$model" --no-mmproj --host 0.0.0.0 --port 8080 --ctx-size 2048 >/dev/null
+  local ok=0
+  wait_for_container_health offee-model-pull http://offee-model-pull:8080/health || ok=$?
+  printf '\n'
+  docker_cmd rm -f offee-model-pull >/dev/null 2>&1 || true
+  docker_cmd network rm offee-setup >/dev/null 2>&1 || true
+  [ "$ok" -eq 0 ] || fail "Could not download $model. Check the name with: offee model list"
+  info "Model ready"
+}
+
+pull_whisper_model() {
+  if docker_cmd run --rm -v offee-whisper:/models offee/transcription:local test -s "/models/$whisper_model_file"; then return 0; fi
+  bold "Downloading the transcription model"
+  docker_cmd run --rm -v offee-whisper:/models offee/transcription:local \
+    curl -L --fail --progress-bar -o "/models/$whisper_model_file.part" "$whisper_model_url"
+  docker_cmd run --rm -v offee-whisper:/models offee/transcription:local mv "/models/$whisper_model_file.part" "/models/$whisper_model_file"
+}
+
+wait_for_app() {
+  bold "Starting Offee"
+  for _ in $(seq 1 120); do
+    if curl -sf "http://127.0.0.1:$OFFEE_PORT/api/status" >/dev/null 2>&1; then
+      info "Offee is running at http://127.0.0.1:$OFFEE_PORT"
+      return 0
+    fi
+    sleep 2
+  done
+  fail "Offee did not answer on port $OFFEE_PORT. See: offee logs"
+}
+
+open_browser() {
+  local url="http://127.0.0.1:$OFFEE_PORT"
+  if require_command open; then open "$url"; elif require_command xdg-open; then xdg-open "$url" >/dev/null 2>&1 || true; else info "Open $url"; fi
+}
+
+command_setup() {
+  cpus="$(default_cpus)"; memory="$(default_memory_gb)"; disk=80
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --gpu) save_setting OFFEE_GPU 1; OFFEE_GPU=1 ;;
+      --cpus) cpus="$2"; shift ;;
+      --memory) memory="$2"; shift ;;
+      --disk) disk="$2"; shift ;;
+      --yes) OFFEE_YES=1 ;;
+      *) fail "Unknown option $1" ;;
+    esac
+    shift
+  done
+  install_tools
+  start_vm
+  bold "Building the images"
+  compose build
+  compose pull inference
+  pull_chat_model "$OFFEE_CHAT_MODEL"
+  pull_whisper_model
+  compose up -d
+  wait_for_app
+  info "The switch is sealed: nothing leaves this machine. See: offee switch --help"
+  open_browser
+}
+
+command_start() { start_vm; compose up -d; wait_for_app; }
+
+command_stop() {
+  compose stop
+  if [ "$runtime" = "colima" ]; then colima stop --profile "$profile"; fi
+}
+
+command_status() {
+  if [ "$runtime" = "colima" ]; then colima status --profile "$profile" 2>&1 | sed 's/^/  /' || true; fi
+  compose ps
+  gateway_ctl status || true
+}
+
+command_switch() {
+  case "${1:-}" in
+    seal|ask) gateway_ctl "$1" ;;
+    open) gateway_ctl open "${2:-15}" ;;
+    *)
+      cat <<'USAGE'
+Usage: offee switch seal | ask | open [minutes]
+  seal   nothing leaves (the default after every start)
+  ask    each request waits until you approve it with: offee watch
+  open   requests to listed destinations leave without asking, for N minutes (default 15)
+USAGE
+      ;;
+  esac
+}
+
+command_key() {
+  local name="${1:-}"
+  [ "$name" = "anthropic" ] || fail "Usage: offee key anthropic"
+  local key
+  read -r -s -p "Paste the Anthropic API key (input hidden): " key
+  printf '\n'
+  [ -n "$key" ] || fail "No key entered"
+  (umask 077; printf '%s' "$key" > "$keys_dir/anthropic")
+  info "Stored in $keys_dir/anthropic. Restarting the gateway (the switch returns to sealed)."
+  compose up -d --force-recreate gateway
+}
+
+command_model() {
+  case "${1:-list}" in
+    list)
+      printf '  Current: %s\n\n' "$OFFEE_CHAT_MODEL"
+      grep -v '^#' "$repo_root/config/models.tsv" | while IFS=$'\t' read -r name size notes; do
+        [ -n "$name" ] && printf '  %-40s %-12s %s\n' "$name" "$size" "$notes"
+      done
+      printf '\n  Any GGUF repo on Hugging Face works: offee model use <user>/<repo>[:quant]\n'
+      ;;
+    use)
+      local model="${2:-}"
+      [ -n "$model" ] || fail "Usage: offee model use <user>/<repo>[:quant]"
+      pull_chat_model "$model"
+      save_setting OFFEE_CHAT_MODEL "$model"
+      OFFEE_CHAT_MODEL="$model"
+      compose up -d inference
+      ;;
+    *) fail "Usage: offee model list | use <repo>" ;;
+  esac
+}
+
+command_selftest() {
+  bold "Checking the isolation"
+  local failed=0
+  if [ "$runtime" = "colima" ]; then
+    local shares
+    shares="$(colima ssh --profile "$profile" -- sh -c "findmnt -rn -t virtiofs,9p,fuse.sshfs -o TARGET" 2>/dev/null || true)"
+    if [ -z "$shares" ] || [ "$shares" = "$state_dir/empty" ]; then info "ok   the VM shares no host folder but the empty one"
+    else info "FAIL the VM shares host folders: $shares"; failed=1; fi
+  fi
+  docker_cmd exec offee-app-1 node --disable-warning=ExperimentalWarning apps/server/src/ops/selftest.ts || failed=1
+  if [ "$failed" -ne 0 ]; then fail "Some isolation checks failed"; fi
+  bold "All isolation checks passed"
+}
+
+command_destroy() {
+  confirm "Delete the Offee VM and everything in it (profiles, documents, models)?" || exit 0
+  compose down --volumes || true
+  if [ "$runtime" = "colima" ]; then colima delete --profile "$profile" --force; fi
+  info "Deleted. Your keys and settings stay in $state_dir"
+}
+
+usage() {
+  cat <<'USAGE'
+offee: an office assistant sealed in a VM on this machine
+
+  offee setup [--gpu] [--cpus N] [--memory GB] [--disk GB] [--yes]
+                         install what is missing, create the VM, download models, start
+  offee start | stop | status | open | logs [service]
+  offee switch seal | ask | open [minutes]
+                         control what may leave the machine
+  offee watch            approve or deny requests waiting in ask mode
+  offee key anthropic    store the API key the gateway uses for Claude
+  offee model list | use <repo>
+                         see or change the local chat model
+  offee update           rebuild after pulling a newer Offee
+  offee selftest         prove the app reaches neither the internet nor your files
+  offee destroy          delete the VM and all its data
+USAGE
+}
+
+load_settings
+case "${1:-help}" in
+  setup) shift; command_setup "$@" ;;
+  start) command_start ;;
+  stop) command_stop ;;
+  status) command_status ;;
+  open) open_browser ;;
+  logs) shift; compose logs --tail 200 -f "$@" ;;
+  switch) shift; command_switch "$@" ;;
+  watch) gateway_ctl watch ;;
+  key) shift; command_key "$@" ;;
+  model) shift; command_model "$@" ;;
+  update) compose build && compose up -d && wait_for_app ;;
+  selftest) command_selftest ;;
+  destroy) command_destroy ;;
+  help|--help|-h) usage ;;
+  *) usage; exit 2 ;;
+esac

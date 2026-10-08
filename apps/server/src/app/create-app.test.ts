@@ -130,3 +130,11 @@ describe('validation', () => {
     expect(response.status).toBe(400)
   })
 })
+
+describe('unknown API paths', () => {
+  it('answer 404 in JSON instead of falling through to the web app', async () => {
+    const { request } = setUp({ ok: false, reason: '', reachedProvider: false })
+    const response = await request('/api/nope')
+    expect(response.status).toBe(404)
+  })
+})

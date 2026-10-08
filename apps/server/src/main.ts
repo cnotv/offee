@@ -78,7 +78,8 @@ const app = createApp({
 
 // serveStatic resolves its root against the working directory.
 const webRoot = relative(process.cwd(), settings.webDistDirectory)
-app.use('/assets/*', serveStatic({ root: webRoot }))
+// Built files first (scripts, styles, the icon); any other path is a client route.
+app.use('*', serveStatic({ root: webRoot }))
 app.get('*', serveStatic({ root: webRoot, rewriteRequestPath: () => '/index.html' }))
 
 serve({ fetch: app.fetch, hostname: '0.0.0.0', port: settings.port }, () => {

@@ -18,17 +18,18 @@ export type RemoteModel = {
 }
 
 const refusalSchema = z.object({
-  refusal: z.enum(['sealed', 'denied', 'timeout', 'unknown-destination', 'missing-key']),
+  refusal: z.enum(['sealed', 'denied', 'timeout', 'unknown-destination', 'missing-key', 'unreachable']),
   detail: z.string(),
 })
 
 /**
- * Reads the gateway's refusal out of an SDK error, when that is what it was.
+ * Reads the gateway's refusal out of an SDK error, when that is what it was: a 403 when the
+ * switch or the destination list stops a request, a 502 when the provider cannot be reached.
  * @param error What the SDK threw.
  * @returns The refusal, or null when the error came from elsewhere.
  */
 export const gatewayRefusalOf = (error: unknown): GatewayRefusalBody | null => {
-  if (!(error instanceof Anthropic.PermissionDeniedError)) return null
+  if (!(error instanceof Anthropic.APIError)) return null
   const parsed = refusalSchema.safeParse(error.error)
   return parsed.success ? parsed.data : null
 }
