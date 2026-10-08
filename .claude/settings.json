@@ -1,0 +1,8 @@
+{
+  "extraKnownMarketplaces": {
+    "cnotv": { "source": { "source": "github", "repo": "cnotv/agent-base" } }
+  },
+  "enabledPlugins": {
+    "workflow@cnotv": true
+  }
+}

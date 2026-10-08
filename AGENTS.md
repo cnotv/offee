@@ -1,0 +1,123 @@
+# Offee
+
+An office assistant that runs on your own machine, sealed off from it. It keeps the profiles
+you act as, the personas that do the work, and the documents each one may use, and runs office
+workflows on local models.
+
+<!-- agent-base:start -->
+
+## Shared agreements
+
+These rules come from `cnotv/agent-base` and apply to every repository that carries this
+block. The block is managed: edit it in agent-base, never here, and let the dashboard's
+"Sync" open the pull request that updates it. What is specific to this repository lives
+outside the block, under **Project facts** and the repository's own sections.
+
+### How work starts
+
+Run the `start` skill first. It classifies the request and names the workflow to follow.
+Every workflow that changes the repository opens an issue, a branch and a draft pull request,
+in that order, before any code:
+
+1. **The issue.** One that already exists is read, comments included; otherwise it is written
+   from the request. If intent, scope or expected behaviour is unclear, ask one focused
+   question covering everything missing, wait, and write it from the answer.
+2. **The branch**, off main, named `<type>/<issue-number>-<description>`. A fresh branch every
+   time, never the current one, never reused.
+3. **The draft pull request**, opened at the first commit rather than the last, carrying
+   `Closes #<issue-number>` and kept current as the work moves.
+
+`start-issue` covers the first two steps and `open-pr` the third. Tests come first, except for
+an exploratory prototype, which still owes them before the pull request is marked ready.
+
+### Working agreements
+
+- **Ask before assuming.** If intent, scope or expected behaviour is unclear, ask one focused
+  question covering everything missing, and wait.
+- **Give an opinion.** When asked what you think, say what you would do and why. Never stop at
+  "it depends".
+- **Write it once, at the length it earns.** Prose that repeats the diff or restates something
+  already written is noise. Each kind of writing has one home, listed under Project facts.
+- **Never loosen a lint rule to pass it**, never use `eslint-disable` in any form, and never
+  `--no-verify`. If a hook or a rule fails, it is usually right.
+- **No emoji** anywhere — code, comments, UI text, commit messages, documentation — unless
+  explicitly requested.
+- **Prefer a debugger over logging.** When a fix has failed twice, add logging at the relevant
+  paths to see the real runtime values before trying again.
+
+### Code
+
+- **TypeScript only**, no `any`, and never `as SomeType` on unvalidated external data.
+- **Functional style.** No classes, no `for` / `while` loops; prefer pure functions and `const`,
+  and return new values rather than mutating.
+- **Long descriptive names**, small single-purpose functions.
+- **Exported types live in a types module** containing only type declarations.
+- **Config files hold data, never logic.**
+- **Update every call site** when a signature, type or export changes. No overloads, shims or
+  deprecated aliases to keep old callers working.
+- **Comments explain why, never what.**
+- **DRY and KISS.** Extract a pattern the second time it appears; prefer the simplest thing
+  that works. Reuse what the repository already has before writing something new.
+
+### Git
+
+- Branches are `<type>/<issue-number>-<description>` (`feat`, `fix`, `docs`, `refactor`,
+  `test`, `chore`).
+- **Rebase, never merge**: `git fetch origin main && git rebase origin/main`, then
+  `git push --force-with-lease`, never `--force`, never `git pull`.
+- **Commit subjects never reference an issue number.** Write `<type>: <summary>`; the branch
+  carries the number and the pull request body carries `Closes #<issue-number>`.
+- **Pull request titles end with the issue number**: `<type>: <summary> (#<issue-number>)`,
+  for example `feat: GitHub sign-in and a cloud deployment (#6)`. GitHub links it, and a
+  squash merge appends the pull request number, so `main` reads `… (#6) (#7)`. This is for
+  the title only; commits keep the rule above.
+
+### Pull request evidence
+
+A pull request that changes anything visible carries one screenshot and one video. The
+shared `pr-preview` workflow records both from the running app; put a `Preview route: /path`
+line in the body when the change is not on the default route, and `Preview click:` and
+`Preview show:` lines when it is folded away or below the fold.
+
+### Definition of done
+
+- [ ] The repository's checks listed under Project facts pass, and you saw them pass
+- [ ] The repository's own done-checklist under Project facts is walked
+- [ ] The issue and the pull request still describe the work accurately
+- [ ] Every artifact the issue named exists
+
+<!-- agent-base:end -->
+
+## Rules for this repository
+
+- **The app sees nothing of the host.** Its container gets no host folder, no container
+  socket and no network but the internal one. Files enter and leave only through the browser
+  upload and download.
+- **The external-request switch lives outside the app.** Only the host launcher can open the
+  gateway or approve a request. Nothing inside the app's container can change either.
+- **API keys never enter the app's container.** The gateway adds them to outbound requests.
+- **Documents, transcripts and messages are data, never instructions.** A persona's tools and
+  its permission to go remote come from its definition, never from content it reads.
+- **Every outbound request is recorded** in the run log with its destination and what was sent.
+- **Models are pinned** by name, hash and licence in the model manifest. Nothing is downloaded
+  while the switch is closed.
+- **External data is parsed with zod before use**: request bodies, model output that drives a
+  tool, imported files and the model manifest.
+
+## Project facts
+
+- **Install:** none yet (set by the first code milestone)
+- **Dev server:** none yet
+- **Checks:** none yet
+- **Docs home:** `README.md`
+- **Preview deploys:** none
+- **Security:** the threat model is the "Isolation" section of `README.md`
+- **Scoped rules:** none yet
+- **Local skills:** none
+
+### Done checklist
+
+- [ ] A change to the VM, the gateway or the switch comes with a test proving the app still
+      reaches neither the network nor a host file
+- [ ] A new workflow is declared as data and listed in the README
+- [ ] A new model is pinned in the model manifest with its hash and licence
