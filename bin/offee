@@ -47,6 +47,10 @@ save_setting() {
   mv "$settings_file.tmp" "$settings_file"
 }
 
+read_key() {
+  if [ -f "$keys_dir/$1" ]; then cat "$keys_dir/$1"; fi
+}
+
 docker_cmd() {
   if [ "$runtime" = "docker" ]; then docker "$@"; else docker --context "colima-$profile" "$@"; fi
 }
@@ -55,8 +59,7 @@ compose() {
   local files=(-f "$repo_root/compose.yaml")
   [ "${OFFEE_GPU:-0}" = "1" ] && files+=(-f "$repo_root/compose.gpu.yaml")
   # The key reaches the gateway container through its environment only, read fresh each time.
-  local key_file="$keys_dir/anthropic"
-  ANTHROPIC_API_KEY="$( [ -f "$key_file" ] && cat "$key_file" || true )" \
+  ANTHROPIC_API_KEY="$(read_key anthropic)" \
     docker_cmd compose --project-directory "$repo_root" "${files[@]}" "$@"
 }
 
