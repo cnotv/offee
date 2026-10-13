@@ -109,7 +109,9 @@ On a Mac with Apple Silicon (macOS 13 or later, 16 GB of memory or more) with
 The menu bar icon holds the switch. In **Ask** mode every outbound request appears as a Mac
 dialog showing exactly what would be sent; the page inside the VM can neither draw nor answer
 that dialog. **Settings and setup…** stores the Anthropic key, runs the isolation check, and
-starts or stops the VM. Quitting the app stops the VM.
+starts or stops the VM. Quitting the app stops the VM. When something goes wrong, **Show log
+file** in the same menu opens `~/Library/Logs/Offee/offee.log`, which holds every launcher run
+and error.
 
 The window that shows Offee is a locked-down browser: no Node.js, no bridge to the app, no
 permissions but copying text, and no request, link or navigation off `127.0.0.1:8470`. That

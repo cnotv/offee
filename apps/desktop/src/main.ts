@@ -1,9 +1,9 @@
 import { spawn } from 'node:child_process'
-import { existsSync } from 'node:fs'
+import { appendFileSync, existsSync, mkdirSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, session, Tray } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, session, shell, Tray } from 'electron'
 import type { IpcMainInvokeEvent, MenuItemConstructorOptions, WebContents } from 'electron'
 import { z } from 'zod'
 import { approvalPromptFor, parsePendingReply, parseStatusReply, requestsToAsk } from './gateway-replies.ts'
@@ -17,6 +17,9 @@ const launcherPath = app.isPackaged ? join(process.resourcesPath, 'offee', 'bin'
 const stateDirectory = process.env.OFFEE_HOME ?? join(homedir(), '.offee')
 const controlPageUrl = pathToFileURL(join(distDirectory, 'control', 'index.html')).href
 const pollMilliseconds = 3000
+const logDirectory = app.getPath('logs')
+const logFile = join(logDirectory, 'offee.log')
+const smokeTest = process.env.OFFEE_SMOKE_TEST === '1'
 
 const switchRequestSchema = z.discriminatedUnion('mode', [
   z.object({ mode: z.literal('sealed') }),
@@ -33,6 +36,7 @@ const runtime: {
   controlWindow: BrowserWindow | null
   askedRequestIds: Set<string>
   reviewing: boolean
+  errorShown: boolean
 } = {
   state: { phase: 'checking', gateway: null, hasAnthropicKey: false, message: null },
   tray: null,
@@ -40,15 +44,46 @@ const runtime: {
   controlWindow: null,
   askedRequestIds: new Set(),
   reviewing: false,
+  errorShown: false,
 }
+
+// Everything the launcher prints and every error lands here, so a failure on someone's Mac
+// can be read afterwards.
+const writeLog = (text: string): void => {
+  try {
+    mkdirSync(logDirectory, { recursive: true })
+    appendFileSync(logFile, text.endsWith('\n') ? text : `${text}\n`)
+  } catch {
+    // Logging must never be what breaks the app.
+  }
+}
+
+const describeError = (error: unknown): string => (error instanceof Error ? (error.stack ?? error.message) : String(error))
+
+// An unexpected error is logged and shown once, and the app keeps running from the menu bar
+// instead of disappearing.
+const reportUnexpectedError = (error: unknown): void => {
+  writeLog(`${new Date().toISOString()} unexpected error: ${describeError(error)}`)
+  if (runtime.errorShown || !app.isReady()) return
+  runtime.errorShown = true
+  dialog.showErrorBox('Offee ran into a problem', `${error instanceof Error ? error.message : String(error)}\n\nDetails are in ${logFile}`)
+}
+
+process.on('uncaughtException', reportUnexpectedError)
+process.on('unhandledRejection', reportUnexpectedError)
 
 const isSetUp = (): boolean => existsSync(join(stateDirectory, 'setup-complete'))
 const hasAnthropicKey = (): boolean => existsSync(join(stateDirectory, 'keys', 'anthropic'))
 
-const sendLog = (text: string): void => runtime.controlWindow?.webContents.send('offee:log', text)
+const sendLog = (text: string): void => {
+  writeLog(text)
+  runtime.controlWindow?.webContents.send('offee:log', text)
+}
 
-const launcher = (args: string[], stdin?: string) =>
-  runLauncher(args, { launcherPath, onOutput: sendLog, ...(stdin === undefined ? {} : { stdin }) })
+const launcher = (args: string[], stdin?: string) => {
+  writeLog(`${new Date().toISOString()} offee ${args[0] ?? ''}`)
+  return runLauncher(args, { launcherPath, onOutput: sendLog, ...(stdin === undefined ? {} : { stdin }) })
+}
 
 // Polling output stays out of the log window, which would otherwise fill with status lines.
 const quietLauncher = (args: string[]) => runLauncher(args, { launcherPath })
@@ -99,7 +134,12 @@ const openOffeeWindow = (): void => {
     runtime.offeeWindow = null
   })
   runtime.offeeWindow = window
-  void window.loadURL(offeeOrigin)
+  window.loadURL(offeeOrigin).catch((error: unknown) => {
+    writeLog(`${new Date().toISOString()} Offee did not answer: ${describeError(error)}`)
+    window.close()
+    updateState({ phase: 'failed', message: `Offee did not answer at ${offeeOrigin}. Try starting it again; the log is in ${logFile}.` })
+    openControlWindow()
+  })
 }
 
 const openControlWindow = (): void => {
@@ -117,13 +157,24 @@ const openControlWindow = (): void => {
     runtime.controlWindow = null
   })
   runtime.controlWindow = window
-  void window.loadURL(controlPageUrl)
+  if (smokeTest) window.webContents.once('did-finish-load', () => void reportSmokeTest(window))
+  window.loadURL(controlPageUrl).catch(reportUnexpectedError)
+}
+
+// CI opens the packaged app with OFFEE_SMOKE_TEST=1: the settings page must render through
+// its preload, or the build fails.
+const reportSmokeTest = async (window: BrowserWindow): Promise<void> => {
+  const rendered: unknown = await window.webContents.executeJavaScript(
+    "typeof window.offeeControl === 'object' && document.body.innerText.includes('Set up Offee')",
+  )
+  process.stdout.write(`smoke: settings window ${rendered === true ? 'rendered' : 'did not render'}\n`)
+  app.exit(rendered === true ? 0 : 1)
 }
 
 const describeFailure = (output: string): string =>
   output.includes('Homebrew is needed')
     ? 'Offee needs Homebrew to install Colima and Docker. Install it from https://brew.sh, then run setup again.'
-    : 'Something failed. The log below says what; fix it and try again.'
+    : `Something failed. The log below says what; it is also saved in ${logFile}.`
 
 const runSetup = async (): Promise<void> => {
   const { response } = await dialog.showMessageBox({
@@ -241,6 +292,7 @@ const performTrayAction = async (action: TrayAction): Promise<void> => {
   }
   if (action.kind === 'start') await start()
   if (action.kind === 'stop') await stop()
+  if (action.kind === 'show-log') shell.showItemInFolder(logFile)
   if (action.kind === 'quit') app.quit()
 }
 

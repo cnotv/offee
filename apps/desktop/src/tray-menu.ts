@@ -45,6 +45,7 @@ export const trayEntries = (phase: AppPhase, gateway: GatewayStatus | null, now:
     phase === 'running'
       ? { type: 'action', label: 'Stop Offee', action: { kind: 'stop' }, enabled: true }
       : { type: 'action', label: 'Start Offee', action: { kind: 'start' }, enabled: phase === 'stopped' || phase === 'failed' },
+    { type: 'action', label: 'Show log file', action: { kind: 'show-log' }, enabled: true },
     { type: 'separator' },
     { type: 'action', label: 'Quit', action: { kind: 'quit' }, enabled: true },
   ]

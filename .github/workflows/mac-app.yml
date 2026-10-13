@@ -22,20 +22,30 @@ jobs:
       - run: pnpm --filter @offee/desktop build
       - run: pnpm --filter @offee/desktop package:mac
 
-      # Opens the packaged app once with an empty state folder: it must start, show the
-      # settings window asking for setup, and stay up.
+      # macOS's own Bash is 3.2, older than the one on Linux runners; the app runs the launcher
+      # with it, so the launcher is exercised with it here, against a stand-in Docker CLI.
+      - name: Launcher on macOS Bash
+        run: |
+          stub="$RUNNER_TEMP/stub-bin"
+          mkdir -p "$stub"
+          printf '%s\n' '#!/bin/sh' 'case "$*" in *"ctl.ts --json status"*) echo "{\"ok\":true}";; *) echo "docker $*";; esac' > "$stub/docker"
+          chmod +x "$stub/docker"
+          /bin/bash --version | head -1
+          out="$(PATH="$stub:$PATH" OFFEE_HOME="$RUNNER_TEMP/offee-home" OFFEE_RUNTIME=docker /bin/bash bin/offee ctl --json status < /dev/null)"
+          echo "$out"
+          [ "$out" = '{"ok":true}' ]
+
+      # Opens the packaged app with an empty state: the settings window must render through its
+      # preload, which the app checks itself and reports before quitting.
       - name: Smoke test
         run: |
-          export OFFEE_HOME="$RUNNER_TEMP/offee-home" ELECTRON_ENABLE_LOGGING=1
           app="apps/desktop/build/out/Offee-darwin-arm64/Offee.app/Contents/MacOS/Offee"
-          "$app" > "$RUNNER_TEMP/offee.log" 2>&1 &
-          pid=$!
-          sleep 20
+          OFFEE_HOME="$RUNNER_TEMP/offee-home" OFFEE_SMOKE_TEST=1 perl -e 'alarm 60; exec @ARGV' "$app" | tee "$RUNNER_TEMP/offee.log"
+          grep -q "smoke: settings window rendered" "$RUNNER_TEMP/offee.log"
+          OFFEE_HOME="$RUNNER_TEMP/offee-home" "$app" > /dev/null 2>&1 &
+          sleep 15
           screencapture -x apps/desktop/build/first-launch.png || true
-          if ! kill -0 "$pid"; then cat "$RUNNER_TEMP/offee.log"; exit 1; fi
-          kill "$pid"
-          cat "$RUNNER_TEMP/offee.log"
-          if grep -E "Uncaught|Error:" "$RUNNER_TEMP/offee.log"; then exit 1; fi
+          kill $!
 
       - uses: actions/upload-artifact@v4
         with:

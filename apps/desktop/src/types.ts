@@ -18,6 +18,7 @@ export type TrayAction =
   | { kind: 'review-requests' }
   | { kind: 'start' }
   | { kind: 'stop' }
+  | { kind: 'show-log' }
   | { kind: 'quit' }
 
 export type TrayEntry =

@@ -34,5 +34,8 @@ export const runLauncher = (args: string[], options: LauncherOptions): Promise<L
       resolve({ exitCode: 1, output: chunks.join('') })
     })
     child.on('close', (code) => resolve({ exitCode: code ?? 1, output: chunks.join('') }))
+    // A launcher that exits before reading its input closes the pipe; that is not an error
+    // worth stopping the app for.
+    child.stdin.on('error', () => undefined)
     child.stdin.end(options.stdin ?? '')
   })

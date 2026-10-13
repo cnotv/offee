@@ -86,7 +86,9 @@ compose() {
 gateway_ctl() {
   local tty_flag=()
   [ -t 0 ] && tty_flag=(-it)
-  docker_cmd exec "${tty_flag[@]}" offee-gateway-1 node apps/gateway/src/ctl.ts "$@"
+  # macOS ships Bash 3.2, where an empty array under `set -u` counts as unset: expand it only
+  # when it has entries.
+  docker_cmd exec ${tty_flag[@]+"${tty_flag[@]}"} offee-gateway-1 node apps/gateway/src/ctl.ts "$@"
 }
 
 confirm() {
