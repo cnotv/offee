@@ -64,6 +64,11 @@ const describeError = (error: unknown): string => (error instanceof Error ? (err
 // instead of disappearing.
 const reportUnexpectedError = (error: unknown): void => {
   writeLog(`${new Date().toISOString()} unexpected error: ${describeError(error)}`)
+  if (smokeTest) {
+    process.stderr.write(`smoke: unexpected error: ${describeError(error)}\n`)
+    app.exit(1)
+    return
+  }
   if (runtime.errorShown || !app.isReady()) return
   runtime.errorShown = true
   dialog.showErrorBox('Offee ran into a problem', `${error instanceof Error ? error.message : String(error)}\n\nDetails are in ${logFile}`)
@@ -109,6 +114,21 @@ const updateState = (change: Partial<ControlState>): void => {
   refreshTray()
 }
 
+// Page failures go to the log: a blank or vanished window is otherwise silent.
+const watchForPageFailures = (window: BrowserWindow, name: string): void => {
+  const contents = window.webContents
+  const record = (text: string) => {
+    writeLog(`${new Date().toISOString()} ${name} window: ${text}`)
+    if (smokeTest) process.stderr.write(`smoke: ${name} window: ${text}\n`)
+  }
+  contents.on('did-fail-load', (_event, code, description, url) => record(`failed to load ${url}: ${description} (${code})`))
+  contents.on('preload-error', (_event, path, error) => record(`preload ${path} failed: ${describeError(error)}`))
+  contents.on('render-process-gone', (_event, details) => record(`renderer gone: ${details.reason} (${details.exitCode})`))
+  contents.on('console-message', (event) => {
+    if (event.level === 'error' || event.level === 'warning') record(`console ${event.level}: ${event.message} (${event.sourceId}:${event.lineNumber})`)
+  })
+}
+
 const allowOnlySafePermissions = (target: Electron.Session): void => {
   target.setPermissionRequestHandler((_contents, permission, callback) => callback(isPermissionAllowed(permission)))
   target.setPermissionCheckHandler((_contents, permission) => isPermissionAllowed(permission))
@@ -134,6 +154,7 @@ const openOffeeWindow = (): void => {
     runtime.offeeWindow = null
   })
   runtime.offeeWindow = window
+  watchForPageFailures(window, 'Offee')
   window.loadURL(offeeOrigin).catch((error: unknown) => {
     writeLog(`${new Date().toISOString()} Offee did not answer: ${describeError(error)}`)
     window.close()
@@ -157,6 +178,7 @@ const openControlWindow = (): void => {
     runtime.controlWindow = null
   })
   runtime.controlWindow = window
+  watchForPageFailures(window, 'settings')
   if (smokeTest) window.webContents.once('did-finish-load', () => void reportSmokeTest(window))
   window.loadURL(controlPageUrl).catch(reportUnexpectedError)
 }
@@ -164,11 +186,14 @@ const openControlWindow = (): void => {
 // CI opens the packaged app with OFFEE_SMOKE_TEST=1: the settings page must render through
 // its preload, or the build fails.
 const reportSmokeTest = async (window: BrowserWindow): Promise<void> => {
-  const rendered: unknown = await window.webContents.executeJavaScript(
-    "typeof window.offeeControl === 'object' && document.body.innerText.includes('Set up Offee')",
+  // React renders after the load event, so give it a moment before reading the page.
+  await new Promise((resolve) => setTimeout(resolve, 3000))
+  const page: unknown = await window.webContents.executeJavaScript(
+    "JSON.stringify({ bridge: typeof window.offeeControl, text: document.body.innerText.slice(0, 300) })",
   )
-  process.stdout.write(`smoke: settings window ${rendered === true ? 'rendered' : 'did not render'}\n`)
-  app.exit(rendered === true ? 0 : 1)
+  const rendered = typeof page === 'string' && page.includes('"bridge":"object"') && page.includes('Set up Offee')
+  process.stdout.write(`smoke: settings window ${rendered ? 'rendered' : 'did not render'}: ${String(page)}\n`)
+  app.exit(rendered ? 0 : 1)
 }
 
 const describeFailure = (output: string): string =>
@@ -357,7 +382,16 @@ app.on('window-all-closed', () => {
 app.on('activate', () => (runtime.state.phase === 'running' ? openOffeeWindow() : openControlWindow()))
 app.on('before-quit', stopInBackground)
 
+if (smokeTest) {
+  process.stdout.write('smoke: starting\n')
+  setTimeout(() => {
+    process.stderr.write('smoke: the settings window did not finish loading within 40 seconds\n')
+    app.exit(1)
+  }, 40_000)
+}
+
 await app.whenReady()
+if (smokeTest) process.stdout.write('smoke: ready\n')
 allowOnlySafePermissions(session.defaultSession)
 registerControlHandlers()
 createTray()
