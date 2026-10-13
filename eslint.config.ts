@@ -22,7 +22,7 @@ const functionalStyle = {
 
 export default typescript.config(
   {
-    ignores: ['**/dist/**', '**/node_modules/**'],
+    ignores: ['**/dist/**', '**/node_modules/**', '**/build/**'],
   },
   javascript.configs.recommended,
   ...typescript.configs.recommended,
@@ -58,7 +58,7 @@ export default typescript.config(
     rules: { 'jsdoc/require-returns': 'off', 'jsdoc/require-param': 'off' },
   },
   {
-    files: ['apps/web/**/*.tsx', 'apps/web/**/*.ts'],
+    files: ['apps/web/**/*.tsx', 'apps/web/**/*.ts', 'apps/desktop/control/**/*.tsx', 'apps/desktop/control/**/*.ts'],
     plugins: { 'react-hooks': reactHooks },
     rules: reactHooks.configs.recommended.rules,
   },

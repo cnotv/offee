@@ -1,0 +1,56 @@
+name: Mac app
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @offee/desktop build
+      - run: pnpm --filter @offee/desktop package:mac
+
+      # Opens the packaged app once with an empty state folder: it must start, show the
+      # settings window asking for setup, and stay up.
+      - name: Smoke test
+        run: |
+          export OFFEE_HOME="$RUNNER_TEMP/offee-home" ELECTRON_ENABLE_LOGGING=1
+          app="apps/desktop/build/out/Offee-darwin-arm64/Offee.app/Contents/MacOS/Offee"
+          "$app" > "$RUNNER_TEMP/offee.log" 2>&1 &
+          pid=$!
+          sleep 20
+          screencapture -x apps/desktop/build/first-launch.png || true
+          if ! kill -0 "$pid"; then cat "$RUNNER_TEMP/offee.log"; exit 1; fi
+          kill "$pid"
+          cat "$RUNNER_TEMP/offee.log"
+          if grep -E "Uncaught|Error:" "$RUNNER_TEMP/offee.log"; then exit 1; fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Offee-arm64
+          path: |
+            apps/desktop/build/Offee-arm64.dmg
+            apps/desktop/build/first-launch.png
+
+      # A rolling pre-release, so the newest disk image always has the same download page.
+      - name: Publish the preview
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          gh release delete mac-preview --yes --cleanup-tag || true
+          gh release create mac-preview apps/desktop/build/Offee-arm64.dmg \
+            --prerelease --target "$TARGET" --title "Offee for Mac (preview)" \
+            --notes "Built from $TARGET. Apple Silicon only. Not notarized: the first time, right-click Offee in Applications and choose Open (on macOS 15, allow it in System Settings, Privacy & Security)."

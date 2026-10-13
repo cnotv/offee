@@ -91,7 +91,9 @@ const watchForApprovals = async (): Promise<void> => {
   await watchForApprovals()
 }
 
-const [verb, argument] = process.argv.slice(2)
+// `--json` prints the raw reply for the Mac app, which parses it instead of reading prose.
+const jsonOutput = process.argv.includes('--json')
+const [verb, argument] = process.argv.slice(2).filter((value) => value !== '--json')
 
 const commandFor = (): ControlCommand | 'watch' | undefined => {
   if (verb === 'status' || verb === 'seal' || verb === 'ask' || verb === 'pending') return { command: verb }
@@ -103,11 +105,15 @@ const commandFor = (): ControlCommand | 'watch' | undefined => {
 
 const command = commandFor()
 if (command === undefined) {
-  process.stderr.write('Usage: ctl status | seal | ask | open <minutes> | pending | approve <id> | deny <id> | watch\n')
+  process.stderr.write('Usage: ctl [--json] status | seal | ask | open <minutes> | pending | approve <id> | deny <id> | watch\n')
   process.exitCode = 2
 } else if (command === 'watch') {
   process.stdout.write('Watching for requests that need approval. Ctrl-C to stop.\n')
   await watchForApprovals()
+} else if (jsonOutput) {
+  const reply = await send(command)
+  process.stdout.write(`${JSON.stringify(reply)}\n`)
+  if (!reply.ok) process.exitCode = 1
 } else {
   printReply(await send(command))
 }
