@@ -390,15 +390,20 @@ if (smokeTest) {
   }, 40_000)
 }
 
-await app.whenReady()
-if (smokeTest) process.stdout.write('smoke: ready\n')
-allowOnlySafePermissions(session.defaultSession)
-registerControlHandlers()
-createTray()
-setInterval(() => void pollGateway(), pollMilliseconds)
-if (isSetUp()) {
-  void start()
-} else {
-  updateState({ phase: 'needs-setup' })
-  openControlWindow()
+// No top-level await here: in an ES module main, Electron fires `ready` only after this module
+// has finished evaluating, so awaiting it at the top level waits forever.
+const startApp = (): void => {
+  if (smokeTest) process.stdout.write('smoke: ready\n')
+  allowOnlySafePermissions(session.defaultSession)
+  registerControlHandlers()
+  createTray()
+  setInterval(() => void pollGateway(), pollMilliseconds)
+  if (isSetUp()) {
+    void start()
+  } else {
+    updateState({ phase: 'needs-setup' })
+    openControlWindow()
+  }
 }
+
+app.whenReady().then(startApp).catch(reportUnexpectedError)
