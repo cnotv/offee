@@ -4,7 +4,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends build-essential
   && rm -rf /var/lib/apt/lists/*
 RUN git clone --depth 1 --branch "$WHISPER_VERSION" https://github.com/ggml-org/whisper.cpp /src
 WORKDIR /src
-RUN cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DWHISPER_BUILD_TESTS=OFF \
+# GCC 12 does not know Apple's cores, so on a Mac `-mcpu=native` inside the VM reports a plain
+# armv8-a and the half-precision kernels fail to build. Naming the architecture avoids the
+# guess: armv8.2-a with fp16 and dotprod runs on every Apple silicon Mac and current ARM servers.
+RUN case "$(uname -m)" in \
+      aarch64|arm64) cpu_options="-DGGML_NATIVE=OFF -DGGML_CPU_ARM_ARCH=armv8.2-a+fp16+dotprod" ;; \
+      *) cpu_options="" ;; \
+    esac \
+  && cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DWHISPER_BUILD_TESTS=OFF $cpu_options \
   && cmake --build build --config Release --target whisper-server -j "$(nproc)"
 
 FROM debian:bookworm-slim

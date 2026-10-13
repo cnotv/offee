@@ -21,7 +21,11 @@ jobs:
       - run: shellcheck bin/offee
 
   images:
-    runs-on: ubuntu-latest
+    # Apple silicon Macs build the images for arm64, so they are built on both architectures.
+    strategy:
+      matrix:
+        runner: [ubuntu-latest, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v5
       - run: docker build -f deploy/app.Dockerfile .
