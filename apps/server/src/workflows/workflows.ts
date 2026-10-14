@@ -88,6 +88,7 @@ export const createWorkflows = (dependencies: WorkflowDependencies) => {
       })
       const runId = dependencies.runs.record({
         workflow: 'chat',
+        conversationId: request.conversationId,
         title: request.message.slice(0, 80),
         model: generation.model,
         input: request.message,

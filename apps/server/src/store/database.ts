@@ -1,4 +1,5 @@
 import { DatabaseSync } from 'node:sqlite'
+import { z } from 'zod'
 
 const schema = `
   CREATE TABLE IF NOT EXISTS profiles (
@@ -46,6 +47,16 @@ const schema = `
   );
 `
 
+// Columns added after the first release, for databases created before them.
+const addedColumns = [{ table: 'runs', column: 'conversation_id', definition: 'TEXT' }]
+
+const columnNamesSchema = z.array(z.object({ name: z.string() }))
+
+const addMissingColumns = (database: DatabaseSync): void =>
+  addedColumns
+    .filter(({ table, column }) => !columnNamesSchema.parse(database.prepare(`PRAGMA table_info(${table})`).all()).some((existing) => existing.name === column))
+    .forEach(({ table, column, definition }) => database.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`))
+
 /**
  * Opens the database and creates any missing table.
  * @param filePath The SQLite file, or ':memory:' in tests.
@@ -55,5 +66,7 @@ export const openDatabase = (filePath: string): DatabaseSync => {
   const database = new DatabaseSync(filePath)
   database.exec('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;')
   database.exec(schema)
+  addMissingColumns(database)
+  database.exec('CREATE INDEX IF NOT EXISTS runs_by_conversation ON runs (conversation_id, created_at)')
   return database
 }

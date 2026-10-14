@@ -11,19 +11,21 @@ import {
   ReaderIcon,
   StackIcon,
 } from '@radix-ui/react-icons'
-import { Badge, Box, Flex, Heading, Text, Tooltip } from '@radix-ui/themes'
+import { Badge, Box, Flex, Heading, Spinner, Text, Tooltip } from '@radix-ui/themes'
 import { useEffect } from 'react'
 import { NavLink, Outlet, useMatches } from 'react-router'
 import type { AppStatus } from '@offee/contracts'
 import { useLoad } from '@/hooks/useLoad'
+import { useWorkflowActivity } from '@/hooks/useWorkflowPages'
 import { api } from '@/lib/api'
 import { describeSwitch } from '@/lib/presentation'
+import type { WorkflowPage } from '@/lib/types'
 
-const navigationItems = [
-  { title: 'Chat', path: '/chat', Icon: ChatBubbleIcon },
-  { title: 'Reply', path: '/reply', Icon: Pencil2Icon },
-  { title: 'Translate', path: '/translate', Icon: GlobeIcon },
-  { title: 'Review', path: '/review', Icon: ReaderIcon },
+const navigationItems: { title: string; path: string; Icon: typeof ChatBubbleIcon; page?: WorkflowPage }[] = [
+  { title: 'Chat', path: '/chat', Icon: ChatBubbleIcon, page: 'chat' },
+  { title: 'Reply', path: '/reply', Icon: Pencil2Icon, page: 'reply' },
+  { title: 'Translate', path: '/translate', Icon: GlobeIcon, page: 'translate' },
+  { title: 'Review', path: '/review', Icon: ReaderIcon, page: 'review' },
   { title: 'Forms', path: '/forms', Icon: FileTextIcon },
   { title: 'Library', path: '/library', Icon: StackIcon },
   { title: 'Profiles', path: '/profiles', Icon: IdCardIcon },
@@ -67,6 +69,7 @@ export const AppShell = () => {
     .filter((title): title is string => title !== null)
     .at(-1)
   const status = useLoad(loadStatus)
+  const activity = useWorkflowActivity()
   const reloadStatus = status.reload
 
   useEffect(() => {
@@ -84,10 +87,11 @@ export const AppShell = () => {
           </Text>
         </Flex>
         <Flex direction={{ initial: 'row', sm: 'column' }} wrap={{ initial: 'wrap', sm: 'nowrap' }} gap="1">
-          {navigationItems.map(({ title, path, Icon }) => (
+          {navigationItems.map(({ title, path, Icon, page }) => (
             <NavLink key={path} to={path} className="app-nav-link">
               <Icon />
               <Text size="2">{title}</Text>
+              {page !== undefined && activity[page].busy && <Spinner size="1" aria-label={`${title} is working`} />}
             </NavLink>
           ))}
         </Flex>

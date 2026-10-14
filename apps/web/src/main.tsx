@@ -1,3 +1,4 @@
+import './lib/zod-setup'
 import '@radix-ui/themes/styles.css'
 import './styles.css'
 import { Theme } from '@radix-ui/themes'
@@ -8,6 +9,7 @@ import { AppShell } from '@/components/AppShell'
 import { useColorScheme } from '@/hooks/useColorScheme'
 import { DirectoryProvider } from '@/hooks/useDirectory'
 import { WorkContextProvider } from '@/hooks/useWorkContext'
+import { WorkflowPagesProvider } from '@/hooks/useWorkflowPages'
 import { ChatView } from '@/views/ChatView'
 import { FormsView } from '@/views/FormsView'
 import { LibraryView } from '@/views/LibraryView'
@@ -50,7 +52,9 @@ createRoot(rootElement).render(
     <SystemTheme>
       <DirectoryProvider>
         <WorkContextProvider>
-          <RouterProvider router={router} />
+          <WorkflowPagesProvider>
+            <RouterProvider router={router} />
+          </WorkflowPagesProvider>
         </WorkContextProvider>
       </DirectoryProvider>
     </SystemTheme>
