@@ -156,6 +156,13 @@ wait_for_container_health() {
   return 1
 }
 
+# The downloads run in containers of their own, which outlive this script if it is killed:
+# remove them, so that cancelling setup or quitting the Mac app stops the traffic too.
+remove_downloads() {
+  docker_cmd rm -f offee-model-pull offee-whisper-pull >/dev/null 2>&1 || true
+  docker_cmd network rm offee-setup >/dev/null 2>&1 || true
+}
+
 # Runs llama.cpp once against the models volume until it serves the model or stops.
 serve_model_once() {
   local model="$1" image="$2" ok=0
@@ -182,8 +189,7 @@ pull_chat_model() {
     if ! docker_cmd logs offee-model-pull 2>&1 | grep -q "download failed after"; then break; fi
     if [ "$attempt" -lt "$attempts" ]; then info "The download stopped; resuming (try $((attempt + 1)) of $attempts)"; fi
   done
-  docker_cmd rm -f offee-model-pull >/dev/null 2>&1 || true
-  docker_cmd network rm offee-setup >/dev/null 2>&1 || true
+  remove_downloads
   [ "$ok" -eq 0 ] || fail "Could not download $model. Run setup again to resume, or check the name with: offee model list"
   info "Model ready"
 }
@@ -191,7 +197,7 @@ pull_chat_model() {
 pull_whisper_model() {
   if docker_cmd run --rm -v offee-whisper:/models offee/transcription:local test -s "/models/$whisper_model_file"; then return 0; fi
   bold "Downloading the transcription model"
-  docker_cmd run --rm -v offee-whisper:/models offee/transcription:local \
+  docker_cmd run --rm --name offee-whisper-pull -v offee-whisper:/models offee/transcription:local \
     curl -L --fail --progress-bar -o "/models/$whisper_model_file.part" "$whisper_model_url"
   docker_cmd run --rm -v offee-whisper:/models offee/transcription:local mv "/models/$whisper_model_file.part" "/models/$whisper_model_file"
 }
@@ -228,6 +234,9 @@ command_setup() {
   done
   install_tools
   start_vm
+  trap remove_downloads EXIT
+  trap 'exit 130' INT
+  trap 'exit 143' TERM HUP
   bold "Building the images"
   compose build
   compose pull inference
@@ -242,6 +251,7 @@ command_setup() {
 command_start() { start_vm; compose up -d; wait_for_app; }
 
 command_stop() {
+  remove_downloads
   compose stop
   if [ "$runtime" = "colima" ]; then colima stop --profile "$profile"; fi
 }

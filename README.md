@@ -104,7 +104,7 @@ cd offee
 ```
 
 `setup` installs Colima and the Docker CLI if they are missing, creates the VM, builds the
-images and downloads the models (about 4 GB the first time), then opens Offee at
+images and downloads the models (about 10 GB the first time), then opens Offee at
 <http://127.0.0.1:8470>. Downloads happen only during setup, before the app starts.
 
 On Linux, install [Colima](https://colima.run) and the Docker CLI with Compose first, then run
