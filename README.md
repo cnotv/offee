@@ -7,6 +7,11 @@ notes or recorded talks, translating, and drafting replies to emails and chats.
 
 Nothing leaves the machine unless you open the switch, and the app cannot open it itself.
 
+[![Offee in 70 seconds: chat with sources, leaving a page while the model writes, continuing from the run log, reply, translate and review](docs/media/offee-features.png)](docs/media/offee-features.mp4)
+
+[Watch the 70-second walkthrough](docs/media/offee-features.mp4). It was recorded against a
+stand-in model, so the answers are canned and the model badge reads "stand-in model (demo)".
+
 ## Concepts
 
 - **Profile:** an identity you act as. Name, role, contact details used in forms, signature
