@@ -156,22 +156,35 @@ wait_for_container_health() {
   return 1
 }
 
-pull_chat_model() {
-  local model="$1" image="$llama_image"
-  bold "Downloading the local model $model (this can take a while)"
-  docker_cmd pull "$image" >/dev/null
-  docker_cmd network create offee-setup >/dev/null 2>&1 || true
+# Runs llama.cpp once against the models volume until it serves the model or stops.
+serve_model_once() {
+  local model="$1" image="$2" ok=0
   docker_cmd rm -f offee-model-pull >/dev/null 2>&1 || true
   # llama.cpp fetches the model into the models volume, then serves it; once it answers, the
   # model is cached and the sealed inference container can load it with --offline.
   docker_cmd run -d --name offee-model-pull --network offee-setup -e LLAMA_CACHE=/models -v offee-models:/models \
     "$image" -hf "$model" --no-mmproj --host 0.0.0.0 --port 8080 --ctx-size 2048 >/dev/null
-  local ok=0
   wait_for_container_health offee-model-pull http://offee-model-pull:8080/health || ok=$?
   printf '\n'
+  return "$ok"
+}
+
+pull_chat_model() {
+  local model="$1" image="$llama_image" attempts=10 attempt ok=1
+  bold "Downloading the local model $model (this can take a while)"
+  docker_cmd pull "$image" >/dev/null
+  docker_cmd network create offee-setup >/dev/null 2>&1 || true
+  # llama.cpp gives up on a download after three quick tries but keeps what it fetched and
+  # resumes from there, so running it again carries a large model through a shaky connection.
+  # A wrong model name fails differently and is not retried.
+  for attempt in $(seq 1 "$attempts"); do
+    if serve_model_once "$model" "$image"; then ok=0; break; fi
+    if ! docker_cmd logs offee-model-pull 2>&1 | grep -q "download failed after"; then break; fi
+    if [ "$attempt" -lt "$attempts" ]; then info "The download stopped; resuming (try $((attempt + 1)) of $attempts)"; fi
+  done
   docker_cmd rm -f offee-model-pull >/dev/null 2>&1 || true
   docker_cmd network rm offee-setup >/dev/null 2>&1 || true
-  [ "$ok" -eq 0 ] || fail "Could not download $model. Check the name with: offee model list"
+  [ "$ok" -eq 0 ] || fail "Could not download $model. Run setup again to resume, or check the name with: offee model list"
   info "Model ready"
 }
 
