@@ -178,18 +178,38 @@ start_vm() {
     --mount "$state_dir/empty"
 }
 
-wait_for_container_health() {
-  local name="$1" url="$2" attempts="${3:-720}"
-  for _ in $(seq 1 "$attempts"); do
+model_pull_stall_seconds=600
+
+# Waits until llama.cpp in the download container answers, which it does once the model is
+# downloaded and loaded. llama.cpp draws its progress bar on one redrawn line that its logs
+# cannot show, so this measures the models volume instead and reports every 30 seconds.
+# Returns 1 when the container stopped, 2 when nothing arrived for ten minutes.
+wait_for_model_pull() {
+  local name="offee-model-pull" tick=0 last_mb=0 stalled_seconds=0 mb
+  while true; do
     if [ "$(docker_cmd inspect -f '{{.State.Running}}' "$name" 2>/dev/null)" != "true" ]; then
       docker_cmd logs --tail 30 "$name" >&2 || true
       return 1
     fi
-    if docker_cmd run --rm --network offee-setup offee/transcription:local curl -sf "$url" >/dev/null 2>&1; then return 0; fi
-    printf '\r  %s' "$(docker_cmd logs --tail 1 "$name" 2>&1 | tr -d '\r' | cut -c1-100)"
+    if docker_cmd exec "$name" curl -sf http://localhost:8080/health >/dev/null 2>&1; then return 0; fi
+    if [ $((tick % 6)) -eq 5 ]; then
+      mb="$(docker_cmd exec "$name" du -sm /models 2>/dev/null | awk '{ print $1 }' || true)"
+      mb="${mb:-$last_mb}"
+      if [ "$tick" -eq 5 ]; then
+        info "$(awk -v mb="$mb" 'BEGIN { printf "%.1f GB downloaded", mb / 1024 }')"
+      elif [ "$mb" -gt "$last_mb" ]; then
+        info "$(awk -v mb="$mb" -v rate="$(( (mb - last_mb) / 30 ))" 'BEGIN { printf "%.1f GB downloaded, %d MB/s", mb / 1024, rate }')"
+        stalled_seconds=0
+      else
+        stalled_seconds=$((stalled_seconds + 30))
+        info "$(awk -v mb="$mb" 'BEGIN { printf "%.1f GB downloaded; loading or waiting for the network", mb / 1024 }')"
+      fi
+      last_mb="$mb"
+      if [ "$stalled_seconds" -ge "$model_pull_stall_seconds" ]; then return 2; fi
+    fi
+    tick=$((tick + 1))
     sleep 5
   done
-  return 1
 }
 
 # The downloads run in containers of their own, which outlive this script if it is killed:
@@ -207,8 +227,7 @@ serve_model_once() {
   # model is cached and the sealed inference container can load it with --offline.
   docker_cmd run -d --name offee-model-pull --network offee-setup -e LLAMA_CACHE=/models -v offee-models:/models \
     "$image" -hf "$model" --no-mmproj --host 0.0.0.0 --port 8080 --ctx-size 2048 >/dev/null
-  wait_for_container_health offee-model-pull http://offee-model-pull:8080/health || ok=$?
-  printf '\n'
+  wait_for_model_pull || ok=$?
   return "$ok"
 }
 
@@ -219,10 +238,13 @@ pull_chat_model() {
   docker_cmd network create offee-setup >/dev/null 2>&1 || true
   # llama.cpp gives up on a download after three quick tries but keeps what it fetched and
   # resumes from there, so running it again carries a large model through a shaky connection.
-  # A wrong model name fails differently and is not retried.
+  # A stalled download is retried the same way; a wrong model name fails differently and is not.
+  local status
   for attempt in $(seq 1 "$attempts"); do
-    if serve_model_once "$model" "$image"; then ok=0; break; fi
-    if ! docker_cmd logs offee-model-pull 2>&1 | grep -q "download failed after"; then break; fi
+    status=0
+    serve_model_once "$model" "$image" || status=$?
+    if [ "$status" -eq 0 ]; then ok=0; break; fi
+    if [ "$status" -ne 2 ] && ! docker_cmd logs offee-model-pull 2>&1 | grep -q "download failed after"; then break; fi
     if [ "$attempt" -lt "$attempts" ]; then info "The download stopped; resuming (try $((attempt + 1)) of $attempts)"; fi
   done
   remove_downloads
