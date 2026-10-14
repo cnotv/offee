@@ -11,6 +11,9 @@ profile="offee"
 whisper_model_file="ggml-large-v3-turbo-q5_0.bin"
 whisper_model_url="https://huggingface.co/ggerganov/whisper.cpp/resolve/main/$whisper_model_file"
 default_chat_model="ggml-org/gemma-4-E4B-it-GGUF"
+small_chat_model="ggml-org/gemma-4-E2B-it-GGUF"
+# Images, both models, the build and the VM itself, with room to spare.
+setup_disk_gb=25
 llama_image="ghcr.io/ggml-org/llama.cpp:server-b11459"
 llama_vulkan_image="ghcr.io/ggml-org/llama.cpp:server-vulkan-b11459"
 
@@ -115,20 +118,32 @@ default_cpus() {
   echo $(( cores > 8 ? cores / 2 : (cores > 4 ? 4 : cores) ))
 }
 
+total_memory_gb() {
+  if [ "$(uname -s)" = "Darwin" ]; then echo $(( $(sysctl -n hw.memsize) / 1073741824 ))
+  else echo $(( $(awk '/MemTotal/ {print $2}' /proc/meminfo) / 1048576 )); fi
+}
+
 default_memory_gb() {
   local total_gb
-  if [ "$(uname -s)" = "Darwin" ]; then total_gb=$(( $(sysctl -n hw.memsize) / 1073741824 ))
-  else total_gb=$(( $(awk '/MemTotal/ {print $2}' /proc/meminfo) / 1048576 )); fi
+  total_gb="$(total_memory_gb)"
   local half=$(( total_gb / 2 ))
   echo $(( half < 8 ? 8 : (half > 24 ? 24 : half) ))
 }
 
+vm_exists() { colima list 2>/dev/null | awk '{print $1}' | grep -qx "$profile"; }
+
 start_vm() {
   [ "$runtime" = "docker" ] && return 0
   if colima status --profile "$profile" >/dev/null 2>&1; then return 0; fi
-  if colima list 2>/dev/null | awk '{print $1}' | grep -qx "$profile"; then
-    colima start --profile "$profile" --activate=false
-    return 0
+  if vm_exists; then
+    if colima start --profile "$profile" --activate=false; then return 0; fi
+    # Before setup has finished the VM holds nothing but partial downloads, so a VM that will
+    # not start is replaced. After that it holds your data, which is never deleted unasked.
+    if [ -f "$state_dir/setup-complete" ] || [ "${1:-}" != "--replace-unfinished" ]; then
+      fail "The Offee VM would not start. See: colima status --profile $profile"
+    fi
+    info "fixed the VM from an unfinished setup would not start; creating it again"
+    colima delete --profile "$profile" --force
   fi
   local vm_type="vz"
   [ "$(uname -s)" = "Linux" ] && vm_type="qemu"
@@ -221,6 +236,120 @@ open_browser() {
   if require_command open; then open "$url"; elif require_command xdg-open; then xdg-open "$url" >/dev/null 2>&1 || true; else info "Open $url"; fi
 }
 
+# The check before installing: it clears what an earlier attempt left behind and makes sure
+# this machine can take the install before anything is downloaded, so a problem shows up in
+# the first seconds rather than an hour in.
+check_failures=0
+check_ok() { info "ok    $*"; }
+check_fixed() { info "fixed $*"; }
+check_fail() { info "FAIL  $*"; check_failures=$((check_failures + 1)); }
+
+free_disk_gb() { df -Pk "$HOME" | awk 'NR == 2 { print int($4 / 1048576) }'; }
+
+port_listener() {
+  if require_command lsof; then
+    lsof -nP -iTCP:"$OFFEE_PORT" -sTCP:LISTEN -Fc 2>/dev/null | sed -n 's/^c//p' | head -1
+  elif require_command ss; then
+    ss -Hltnp "sport = :$OFFEE_PORT" 2>/dev/null | sed -n 's/.*users:(("\([^"]*\)".*/\1/p' | head -1
+  fi
+}
+
+offee_is_up() {
+  if [ "$runtime" = "colima" ]; then colima status --profile "$profile" >/dev/null 2>&1
+  else [ -n "$(docker ps -q --filter name=offee-edge-1 2>/dev/null)" ]; fi
+}
+
+check_platform() {
+  case "$(uname -s)/$(uname -m)" in
+    Darwin/arm64)
+      local major
+      major="$(sw_vers -productVersion | cut -d. -f1)"
+      if [ "$major" -ge 13 ]; then check_ok "macOS $(sw_vers -productVersion) on Apple silicon"
+      else check_fail "macOS 13 or later is needed; this Mac runs $(sw_vers -productVersion)"; fi ;;
+    Darwin/*) check_fail "Offee needs a Mac with Apple silicon" ;;
+    Linux/*)
+      if [ "$runtime" = "docker" ] || [ -e /dev/kvm ]; then check_ok "Linux on $(uname -m)"
+      else check_fail "/dev/kvm is missing: enable virtualization so the VM can run"; fi ;;
+    *) check_fail "Offee runs on macOS and Linux" ;;
+  esac
+}
+
+check_tools() {
+  local missing=()
+  require_command docker || missing+=(docker)
+  if [ "$runtime" = "colima" ]; then require_command colima || missing+=(colima); fi
+  if [ ${#missing[@]} -eq 0 ]; then check_ok "Colima and Docker are installed"
+  elif [ "$(uname -s)" = "Darwin" ] && require_command brew; then check_ok "Homebrew will install ${missing[*]}"
+  elif [ "$(uname -s)" = "Darwin" ]; then check_fail "Homebrew is needed to install ${missing[*]}: https://brew.sh"
+  else check_fail "Install ${missing[*]} with your package manager (Colima: https://colima.run)"; fi
+}
+
+check_memory() {
+  local total
+  total="$(total_memory_gb)"
+  if [ "$total" -ge 16 ]; then check_ok "$total GB of memory"
+  elif [ "$total" -ge 8 ] && [ "$OFFEE_CHAT_MODEL" = "$default_chat_model" ]; then
+    save_setting OFFEE_CHAT_MODEL "$small_chat_model"
+    OFFEE_CHAT_MODEL="$small_chat_model"
+    check_fixed "$total GB of memory is not enough for the default model; using $small_chat_model"
+  elif [ "$total" -ge 8 ]; then check_ok "$total GB of memory, with $OFFEE_CHAT_MODEL as you chose"
+  else check_fail "Offee needs 8 GB of memory or more; this machine has $total GB"; fi
+}
+
+check_disk() {
+  local free
+  free="$(free_disk_gb)"
+  if [ -f "$state_dir/setup-complete" ] || [ "$free" -ge "$setup_disk_gb" ]; then check_ok "$free GB free on disk"
+  else check_fail "Setup needs $setup_disk_gb GB free on disk; there are $free GB"; fi
+}
+
+check_port() {
+  local listener
+  if offee_is_up; then check_ok "port $OFFEE_PORT belongs to Offee"; return 0; fi
+  listener="$(port_listener)"
+  if [ -z "$listener" ]; then check_ok "port $OFFEE_PORT is free"
+  else check_fail "port $OFFEE_PORT is taken by $listener: quit it, or set OFFEE_PORT in $settings_file"; fi
+}
+
+# Setup downloads from these, through this machine's own connection. Nothing Offee holds is sent.
+check_downloads() {
+  local unreachable=() host
+  for host in huggingface.co ghcr.io registry-1.docker.io github.com deb.debian.org; do
+    curl -sS -o /dev/null --max-time 15 "https://$host/" 2>/dev/null || unreachable+=("$host")
+  done
+  if [ ${#unreachable[@]} -eq 0 ]; then check_ok "the download sites answer"
+  else check_fail "cannot reach ${unreachable[*]}: check the connection, VPN or firewall"; fi
+}
+
+# Earlier versions let Colima make the Offee VM your default Docker context.
+restore_docker_context() {
+  [ "$runtime" = "colima" ] || return 0
+  [ "$(docker context show 2>/dev/null)" = "colima-$profile" ] || return 0
+  local previous="default"
+  if docker context ls --format '{{.Name}}' 2>/dev/null | grep -qx desktop-linux; then previous="desktop-linux"; fi
+  if docker context use "$previous" >/dev/null; then check_fixed "your Docker context points at $previous again, not the Offee VM"; fi
+}
+
+# Downloads that an interrupted run left in the VM would compete with this one.
+clear_leftovers() {
+  if [ -n "$(docker_cmd ps -aq --filter name=offee-model-pull --filter name=offee-whisper-pull 2>/dev/null)" ]; then
+    remove_downloads
+    check_fixed "stopped downloads left running by an earlier setup"
+  fi
+}
+
+run_checks() {
+  bold "Checking this machine"
+  check_platform
+  check_tools
+  check_memory
+  check_disk
+  check_port
+  check_downloads
+  restore_docker_context
+  if [ "$check_failures" -gt 0 ]; then fail "Fix the $check_failures problem(s) above, then run setup again"; fi
+}
+
 command_setup() {
   cpus="$(default_cpus)"; memory="$(default_memory_gb)"; disk=80
   while [ $# -gt 0 ]; do
@@ -234,8 +363,10 @@ command_setup() {
     esac
     shift
   done
+  run_checks
   install_tools
-  start_vm
+  start_vm --replace-unfinished
+  clear_leftovers
   trap remove_downloads EXIT
   trap 'exit 130' INT
   trap 'exit 143' TERM HUP
@@ -250,7 +381,7 @@ command_setup() {
   open_browser
 }
 
-command_start() { start_vm; compose up -d; wait_for_app; }
+command_start() { restore_docker_context; start_vm; compose up -d; wait_for_app; }
 
 command_stop() {
   remove_downloads
@@ -339,6 +470,7 @@ offee: an office assistant sealed in a VM on this machine
 
   offee setup [--gpu] [--cpus N] [--memory GB] [--disk GB] [--yes]
                          install what is missing, create the VM, download models, start
+  offee check            check this machine and clear what a failed setup left behind
   offee start | stop | status | open | logs [service]
   offee switch seal | ask | open [minutes]
                          control what may leave the machine
@@ -355,6 +487,7 @@ USAGE
 load_settings
 case "${1:-help}" in
   setup) shift; command_setup "$@" ;;
+  check) run_checks; bold "Ready to set up" ;;
   start) command_start ;;
   stop) command_stop ;;
   status) command_status ;;

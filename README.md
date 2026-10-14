@@ -103,6 +103,10 @@ cd offee
 ./bin/offee setup
 ```
 
+`setup` first checks the machine: the platform, memory, free disk space (25 GB), that port
+8470 is free and that the download sites answer. It also clears what an earlier attempt left
+behind, such as a stalled download or a VM that would not start, and picks a smaller model on
+a machine with less than 16 GB of memory. `offee check` runs the same check on its own. Then
 `setup` installs Colima and the Docker CLI if they are missing, creates the VM, builds the
 images and downloads the models (about 10 GB the first time), then opens Offee at
 <http://127.0.0.1:8470>. Downloads happen only during setup, before the app starts.
