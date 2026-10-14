@@ -1,7 +1,22 @@
 #!/usr/bin/env bash
 # Offee's launcher: the only part that runs on the host. It starts the VM, builds and starts
 # the containers, holds the external-request switch, and never reads your files.
-set -euo pipefail
+set -Eeuo pipefail
+
+# fail() explains itself. Anything else that ends the launcher early says where it happened
+# rather than ending without a word, and an interrupted setup takes its downloads with it.
+last_failure=""
+explained=0
+remove_downloads_on_exit=0
+trap 'last_failure="line $LINENO: $BASH_COMMAND"' ERR
+on_exit() {
+  local status=$?
+  if [ "$remove_downloads_on_exit" = 1 ]; then remove_downloads; fi
+  if [ "$status" -ne 0 ] && [ "$explained" = 0 ]; then
+    printf 'offee: stopped unexpectedly at %s\n' "${last_failure:-an unknown step}" >&2
+  fi
+}
+trap on_exit EXIT
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 state_dir="${OFFEE_HOME:-$HOME/.offee}"
@@ -19,7 +34,7 @@ llama_vulkan_image="ghcr.io/ggml-org/llama.cpp:server-vulkan-b11459"
 
 bold() { printf '\033[1m%s\033[0m\n' "$*"; }
 info() { printf '  %s\n' "$*"; }
-fail() { printf '\033[31moffee: %s\033[0m\n' "$*" >&2; exit 1; }
+fail() { explained=1; printf '\033[31moffee: %s\033[0m\n' "$*" >&2; exit 1; }
 
 # OFFEE_RUNTIME=docker uses the Docker engine already running instead of a Colima VM. That is
 # container isolation only, meant for Linux hosts that already isolate Docker, and for tests.
@@ -144,6 +159,10 @@ start_vm() {
     fi
     info "fixed the VM from an unfinished setup would not start; creating it again"
     colima delete --profile "$profile" --force
+  elif [ "${1:-}" != "--replace-unfinished" ]; then
+    # Only setup creates the VM: it alone sizes it and fills it with the images and models.
+    rm -f "$state_dir/setup-complete"
+    fail "Offee is not set up on this machine: its VM is missing. Run setup"
   fi
   local vm_type="vz"
   [ "$(uname -s)" = "Linux" ] && vm_type="qemu"
@@ -248,9 +267,10 @@ free_disk_gb() { df -Pk "$HOME" | awk 'NR == 2 { print int($4 / 1048576) }'; }
 
 port_listener() {
   if require_command lsof; then
-    lsof -nP -iTCP:"$OFFEE_PORT" -sTCP:LISTEN -Fc 2>/dev/null | sed -n 's/^c//p' | head -1
+    # lsof exits with an error when nothing listens, which here is the good news.
+    { lsof -nP -iTCP:"$OFFEE_PORT" -sTCP:LISTEN -Fc 2>/dev/null || true; } | sed -n 's/^c//p' | head -1
   elif require_command ss; then
-    ss -Hltnp "sport = :$OFFEE_PORT" 2>/dev/null | sed -n 's/.*users:(("\([^"]*\)".*/\1/p' | head -1
+    { ss -Hltnp "sport = :$OFFEE_PORT" 2>/dev/null || true; } | sed -n 's/.*users:(("\([^"]*\)".*/\1/p' | head -1
   fi
 }
 
@@ -367,9 +387,9 @@ command_setup() {
   install_tools
   start_vm --replace-unfinished
   clear_leftovers
-  trap remove_downloads EXIT
-  trap 'exit 130' INT
-  trap 'exit 143' TERM HUP
+  remove_downloads_on_exit=1
+  trap 'explained=1; exit 130' INT
+  trap 'explained=1; exit 143' TERM HUP
   bold "Building the images"
   compose build
   compose pull inference
@@ -384,6 +404,10 @@ command_setup() {
 command_start() { restore_docker_context; start_vm; compose up -d; wait_for_app; }
 
 command_stop() {
+  if [ "$runtime" = "colima" ] && ! colima status --profile "$profile" >/dev/null 2>&1; then
+    info "Offee is not running"
+    return 0
+  fi
   remove_downloads
   compose stop
   if [ "$runtime" = "colima" ]; then colima stop --profile "$profile"; fi
@@ -501,5 +525,5 @@ case "${1:-help}" in
   selftest) command_selftest ;;
   destroy) command_destroy ;;
   help|--help|-h) usage ;;
-  *) usage; exit 2 ;;
+  *) usage; explained=1; exit 2 ;;
 esac
