@@ -34,6 +34,13 @@ jobs:
           out="$(PATH="$stub:$PATH" OFFEE_HOME="$RUNNER_TEMP/offee-home" OFFEE_RUNTIME=docker /bin/bash bin/offee ctl --json status < /dev/null)"
           echo "$out"
           [ "$out" = '{"ok":true}' ]
+          # The machine check uses macOS's own tools (sw_vers, sysctl, df, lsof); the runner may
+          # lack the memory Offee needs, so only a clean run of the check itself is required.
+          check="$(PATH="$stub:$PATH" OFFEE_HOME="$RUNNER_TEMP/offee-home" OFFEE_RUNTIME=docker /bin/bash bin/offee check < /dev/null 2>&1 || true)"
+          echo "$check"
+          echo "$check" | grep -q "ok    macOS"
+          echo "$check" | grep -q "the download sites answer"
+          ! echo "$check" | grep -qE "line [0-9]+:|unbound variable|syntax error"
 
       # Opens the packaged app with an empty state: the settings window must render through its
       # preload, which the app checks itself and reports before quitting.

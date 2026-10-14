@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { approvalPromptFor, parsePendingReply, parseStatusReply, requestsToAsk, switchLabel } from './gateway-replies.ts'
+import { describeFailure } from './setup-messages.ts'
 import { trayEntries } from './tray-menu.ts'
 import { isAllowedRequestUrl, isOffeeUrl, isPermissionAllowed, pathWithHomebrew, progressAsLines } from './window-policy.ts'
 
@@ -67,6 +68,17 @@ describe('the menu bar', () => {
   it('opens Offee only when it runs', () => {
     const openEntry = trayEntries('stopped', null, 0).find((entry) => entry.type === 'action' && entry.label === 'Open Offee')
     expect(openEntry).toMatchObject({ enabled: false })
+  })
+})
+
+describe('explaining a failed setup', () => {
+  it('lists every failed machine check', () => {
+    const output = 'Checking this machine\n  ok    32 GB of memory\n  FAIL  Setup needs 25 GB free on disk; there are 12 GB\n  FAIL  cannot reach ghcr.io\noffee: Fix the 2 problem(s) above'
+    expect(describeFailure(output, '/log')).toBe('This Mac is not ready for Offee yet:\n• Setup needs 25 GB free on disk; there are 12 GB\n• cannot reach ghcr.io')
+  })
+
+  it('points to the log for anything else', () => {
+    expect(describeFailure('compose failed', '/log')).toContain('/log')
   })
 })
 

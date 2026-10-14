@@ -18,3 +18,8 @@ body {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+
+/* Failure messages list one problem per line. */
+.control-message {
+  white-space: pre-line;
+}

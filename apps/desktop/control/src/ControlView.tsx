@@ -75,7 +75,7 @@ export const ControlView = () => {
 
       {state.message !== null && (
         <Callout.Root color="red" variant="surface">
-          <Callout.Text>{state.message}</Callout.Text>
+          <Callout.Text className="control-message">{state.message}</Callout.Text>
         </Callout.Root>
       )}
 

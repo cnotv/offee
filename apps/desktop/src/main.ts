@@ -8,6 +8,7 @@ import type { IpcMainInvokeEvent, MenuItemConstructorOptions, WebContents } from
 import { z } from 'zod'
 import { approvalPromptFor, parsePendingReply, parseStatusReply, requestsToAsk } from './gateway-replies.ts'
 import { runLauncher } from './launcher.ts'
+import { describeFailure } from './setup-messages.ts'
 import { trayEntries } from './tray-menu.ts'
 import type { ControlState, PendingRequest, SwitchRequest, TrayAction, TrayEntry } from './types.ts'
 import { isAllowedRequestUrl, isOffeeUrl, isPermissionAllowed, offeeOrigin, pathWithHomebrew, unreachableProxy } from './window-policy.ts'
@@ -241,11 +242,6 @@ const reportOffeeWindowSmokeTest = async (): Promise<void> => {
   app.exit(sealed ? 0 : 1)
 }
 
-const describeFailure = (output: string): string =>
-  output.includes('Homebrew is needed')
-    ? 'Offee needs Homebrew to install Colima and Docker. Install it from https://brew.sh, then run setup again.'
-    : `Something failed. The log below says what; it is also saved in ${logFile}.`
-
 const runSetup = async (): Promise<void> => {
   const { response } = await dialog.showMessageBox({
     type: 'info',
@@ -253,6 +249,7 @@ const runSetup = async (): Promise<void> => {
     message: 'Set up Offee on this Mac?',
     detail: [
       'This will:',
+      '• check this Mac (memory, disk space, the network) and clear what an earlier attempt left behind',
       '• install Colima and the Docker command-line tools with Homebrew, if they are missing',
       '• create a Linux virtual machine that shares no folder with your Mac',
       '• download the local models and images, about 10 GB',
@@ -271,7 +268,7 @@ const runSetup = async (): Promise<void> => {
     updateState({ phase: 'running', message: null })
     openOffeeWindow()
   } else {
-    updateState({ phase: 'failed', message: describeFailure(result.output) })
+    updateState({ phase: 'failed', message: describeFailure(result.output, logFile) })
     openControlWindow()
   }
 }
@@ -284,7 +281,7 @@ const start = async (): Promise<void> => {
     updateState({ phase: 'running', message: null })
     openOffeeWindow()
   } else {
-    updateState({ phase: 'failed', message: describeFailure(result.output) })
+    updateState({ phase: 'failed', message: describeFailure(result.output, logFile) })
     openControlWindow()
   }
 }
