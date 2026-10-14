@@ -104,11 +104,18 @@ line in the body when the change is not on the default route, and `Preview click
 - **External data is parsed with zod before use**: request bodies, model output that drives a
   tool, imported files and the model manifest.
 
+- **The UI is React with Radix Themes**, tables are TanStack Table on Radix `Table`, and the only
+  app CSS is `apps/web/src/styles.css`. Types shared by server, gateway and web live in
+  `packages/contracts/src/types.ts`.
+
 ## Project facts
 
-- **Install:** none yet (set by the first code milestone)
-- **Dev server:** none yet
-- **Checks:** none yet
+- **Install:** `pnpm install`
+- **Dev server:** `pnpm dev` (API on `http://localhost:8470`, UI on `http://localhost:5319` with
+  `/api` proxied); the full app runs with `./bin/offee setup`
+- **Routes:** `/chat` (default), `/reply`, `/translate`, `/review`, `/forms`, `/library`,
+  `/profiles`, `/personas`, `/runs`
+- **Checks:** `pnpm lint --max-warnings 0`, `pnpm typecheck`, `pnpm test`, `shellcheck bin/offee`
 - **Docs home:** `README.md`
 - **Preview deploys:** none
 - **Security:** the threat model is the "Isolation" section of `README.md`

@@ -1,0 +1,20 @@
+# Added by `offee setup --gpu`: the Vulkan build of llama.cpp, given only the VM's GPU device
+# (Colima's krunkit VM type passes the Mac's GPU through as /dev/dri).
+services:
+  inference:
+    image: ${OFFEE_LLAMA_VULKAN_IMAGE:-ghcr.io/ggml-org/llama.cpp:server-vulkan-b11459}
+    devices: [/dev/dri]
+    command:
+      - --offline
+      - -hf
+      - ${OFFEE_CHAT_MODEL:-ggml-org/gemma-4-E4B-it-GGUF}
+      - --no-mmproj
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8080"
+      - --ctx-size
+      - ${OFFEE_CONTEXT_SIZE:-16384}
+      - --jinja
+      - --n-gpu-layers
+      - "999"

@@ -34,7 +34,7 @@ Nothing leaves the machine unless you open the switch, and the app cannot open i
 ```
  host (macOS / Linux)                       VM (Colima)
 ┌──────────────────────────┐   ┌──────────────────────────────────────────┐
-│ launcher                 │   │  app container        no network,        │
+│ launcher (bin/offee)     │   │  app container        no network,        │
 │  - start / stop the VM   │   │  (UI, API, data)      no host folders    │
 │  - unlock the volume     │   │        │ internal network only           │
 │  - the switch: sealed /  │──►│  gateway container ── the only way out,  │
@@ -92,6 +92,63 @@ Nothing found does all of this; these do parts of it and are reused or copied wh
   [doc-translator](https://github.com/JiGuangYa/doc-translator),
   [Scriberr](https://github.com/yb235/Scriberr).
 
+## Try it
+
+On a Mac with Apple Silicon (macOS 13 or later, 16 GB of memory or more) with
+[Homebrew](https://brew.sh):
+
+```sh
+gh repo clone cnotv/offee
+cd offee
+./bin/offee setup
+```
+
+`setup` first checks the machine: the platform, memory, free disk space (25 GB), that port
+8470 is free and that the download sites answer. It also clears what an earlier attempt left
+behind, such as a stalled download or a VM that would not start, and picks a smaller model on
+a machine with less than 16 GB of memory. `offee check` runs the same check on its own. Then
+`setup` installs Colima and the Docker CLI if they are missing, creates the VM, builds the
+images and downloads the models (about 10 GB the first time), then opens Offee at
+<http://127.0.0.1:8470>. Downloads happen only during setup, before the app starts.
+
+On Linux, install [Colima](https://colima.run) and the Docker CLI with Compose first, then run
+the same command.
+
+| Command | What it does |
+| --- | --- |
+| `offee setup [--gpu]` | First install. `--gpu` uses Colima's experimental `krunkit` VM type for the Mac's GPU |
+| `offee start` / `stop` / `status` / `open` / `logs` | Run and inspect it |
+| `offee switch seal` / `ask` / `open 15` | What may leave the machine. Every start is sealed |
+| `offee watch` | Approve or deny requests waiting in ask mode, seeing exactly what would be sent |
+| `offee key anthropic` | Store the key the gateway uses for Claude. The app never sees it |
+| `offee model list` / `use <repo>` | See or change the local model |
+| `offee selftest` | Prove the app reaches neither the internet nor the host |
+| `offee update` | Rebuild after `git pull` |
+| `offee destroy` | Delete the VM and everything in it |
+
+Start with a profile and a persona, add a few documents to the library, then try each workflow.
+To let a persona use Claude: set it to "Remote when the switch allows", run `offee key anthropic`,
+then `offee switch ask` and `offee watch` in a second terminal.
+
+### What this first build does not do yet
+
+- **Encryption at rest of its own:** data sits in the VM's disk, inside your user folder, which
+  FileVault encrypts. A passphrase-unlocked volume is [#3](https://github.com/cnotv/offee/issues/3).
+- **Scanned documents:** text must be selectable; OCR comes later.
+- **Translation layout:** paragraphs are kept, tables and styling are not.
+- **Signatures:** the PDF signature is a CAdES detached signature with a self-signed
+  certificate, valid and tamper-evident, but it lacks the signing-certificate attribute a strict
+  PAdES B-B validator asks for ([#7](https://github.com/cnotv/offee/issues/7)).
+- **Model bundles:** models download from Hugging Face during setup; offline bundles are [#9](https://github.com/cnotv/offee/issues/9).
+
+## Development
+
+```sh
+pnpm install
+pnpm dev        # API on 8470 (expects the model servers), UI on 5319
+pnpm lint --max-warnings 0 && pnpm typecheck && pnpm test
+```
+
 ## Status
 
-Planning. The roadmap is the issue tracker.
+A first test build ([#10](https://github.com/cnotv/offee/issues/10)). The roadmap is the issue tracker.
