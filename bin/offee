@@ -127,7 +127,7 @@ start_vm() {
   [ "$runtime" = "docker" ] && return 0
   if colima status --profile "$profile" >/dev/null 2>&1; then return 0; fi
   if colima list 2>/dev/null | awk '{print $1}' | grep -qx "$profile"; then
-    colima start --profile "$profile"
+    colima start --profile "$profile" --activate=false
     return 0
   fi
   local vm_type="vz"
@@ -137,7 +137,9 @@ start_vm() {
   # VM sees nothing of the host.
   mkdir -p "$state_dir/empty"
   bold "Creating the Offee VM ($vm_type, ${cpus} CPUs, ${memory} GB)"
-  colima start --profile "$profile" --runtime docker --vm-type "$vm_type" \
+  # --activate=false leaves your Docker context alone: Offee always names its own, and your
+  # own docker commands keep going where they went before.
+  colima start --profile "$profile" --activate=false --runtime docker --vm-type "$vm_type" \
     --cpu "$cpus" --memory "$memory" --disk "${disk:-80}" \
     --mount "$state_dir/empty"
 }
