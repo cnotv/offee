@@ -181,6 +181,11 @@ pnpm lint --max-warnings 0 && pnpm typecheck && pnpm test
 pnpm --filter @offee/desktop start   # the Mac app, against the launcher in this checkout
 ```
 
+Netlify publishes the UI alone for every pull request, in **demo mode** (`VITE_DEMO_MODE=1`, set in
+`netlify.toml`): sample profiles, documents and runs, and canned answers held in the browser tab,
+since no Offee server runs there. `VITE_DEMO_MODE=1 pnpm --filter @offee/web dev` runs the same
+locally. A build without it carries no demo code.
+
 ## Status
 
 A first test build ([#10](https://github.com/cnotv/offee/issues/10)). The roadmap is the issue tracker.

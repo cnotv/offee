@@ -17,7 +17,7 @@ import { NavLink, Outlet, useMatches } from 'react-router'
 import type { AppStatus } from '@offee/contracts'
 import { useLoad } from '@/hooks/useLoad'
 import { useWorkflowActivity } from '@/hooks/useWorkflowPages'
-import { api } from '@/lib/api'
+import { api, isDemoMode } from '@/lib/api'
 import { describeSwitch } from '@/lib/presentation'
 import type { WorkflowPage } from '@/lib/types'
 
@@ -47,6 +47,13 @@ const StatusBadges = ({ loaded }: { loaded: LoadedStatus | null }) => {
   const switchState = describeSwitch(status.gateway, loaded.loadedAt)
   return (
     <Flex direction="column" gap="2" className="sidebar-status">
+      {isDemoMode && (
+        <Tooltip content="Sample data and canned answers, kept in this tab only. Nothing you type or upload leaves the browser.">
+          <Badge color="iris" variant="solid" size="2">
+            Demo
+          </Badge>
+        </Tooltip>
+      )}
       <Tooltip content={switchState.hint}>
         <Badge color={switchState.color} variant="soft" size="2">
           {switchState.open ? <LockOpen1Icon /> : <LockClosedIcon />} {switchState.label}
