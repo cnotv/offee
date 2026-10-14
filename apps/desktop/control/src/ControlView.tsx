@@ -91,13 +91,29 @@ export const ControlView = () => {
                 Set up Offee
               </Button>
               {state.phase === 'failed' && (
-                <Button variant="soft" loading={busy || working} onClick={() => run(control.start)}>
-                  <PlayIcon /> Try starting
-                </Button>
+                <>
+                  <Button variant="soft" loading={busy || working} onClick={() => run(control.start)}>
+                    <PlayIcon /> Try starting
+                  </Button>
+                  <Button variant="soft" color="red" loading={busy || working} onClick={() => run(control.stop)}>
+                    <StopIcon /> Stop the VM
+                  </Button>
+                </>
               )}
             </Flex>
           </Flex>
         </Card>
+      )}
+
+      {state.phase === 'setting-up' && (
+        <Flex gap="3" align="center" wrap="wrap">
+          <Text size="2" color="gray">
+            Setting up downloads about 10 GB; it stops when you cancel.
+          </Text>
+          <Button variant="soft" color="red" onClick={() => run(control.stop)}>
+            <StopIcon /> Cancel setup
+          </Button>
+        </Flex>
       )}
 
       {running && (

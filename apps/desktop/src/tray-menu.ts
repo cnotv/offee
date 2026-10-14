@@ -12,6 +12,19 @@ const phaseLabels: Record<AppPhase, string> = {
   failed: 'Needs attention',
 }
 
+// A failed setup or start can leave the VM running, so it can be stopped as well as retried.
+const startAndStopEntries = (phase: AppPhase): TrayEntry[] => {
+  if (phase === 'setting-up') return [{ type: 'action', label: 'Cancel setup', action: { kind: 'stop' }, enabled: true }]
+  if (phase === 'running' || phase === 'starting') return [{ type: 'action', label: 'Stop Offee', action: { kind: 'stop' }, enabled: true }]
+  if (phase === 'failed') {
+    return [
+      { type: 'action', label: 'Start Offee', action: { kind: 'start' }, enabled: true },
+      { type: 'action', label: 'Stop Offee', action: { kind: 'stop' }, enabled: true },
+    ]
+  }
+  return [{ type: 'action', label: 'Start Offee', action: { kind: 'start' }, enabled: phase === 'stopped' }]
+}
+
 /**
  * The menu bar menu for the app's state. Pure, so what each state offers is tested.
  * @param phase Where the app is.
@@ -42,9 +55,7 @@ export const trayEntries = (phase: AppPhase, gateway: GatewayStatus | null, now:
     ...switchEntries,
     { type: 'action', label: 'Open Offee', action: { kind: 'open-offee' }, enabled: running },
     { type: 'action', label: 'Settings and setup…', action: { kind: 'open-control' }, enabled: true },
-    phase === 'running'
-      ? { type: 'action', label: 'Stop Offee', action: { kind: 'stop' }, enabled: true }
-      : { type: 'action', label: 'Start Offee', action: { kind: 'start' }, enabled: phase === 'stopped' || phase === 'failed' },
+    ...startAndStopEntries(phase),
     { type: 'action', label: 'Show log file', action: { kind: 'show-log' }, enabled: true },
     { type: 'separator' },
     { type: 'action', label: 'Quit', action: { kind: 'quit' }, enabled: true },

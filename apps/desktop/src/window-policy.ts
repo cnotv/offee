@@ -1,3 +1,6 @@
+/** Where the Offee window's session sends everything that is not loopback: nowhere. */
+export const unreachableProxy = 'http://0.0.0.0:1'
+
 export const offeeOrigin = 'http://127.0.0.1:8470'
 
 /**

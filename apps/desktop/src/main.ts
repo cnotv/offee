@@ -10,7 +10,7 @@ import { approvalPromptFor, parsePendingReply, parseStatusReply, requestsToAsk }
 import { runLauncher } from './launcher.ts'
 import { trayEntries } from './tray-menu.ts'
 import type { ControlState, PendingRequest, SwitchRequest, TrayAction, TrayEntry } from './types.ts'
-import { isAllowedRequestUrl, isOffeeUrl, isPermissionAllowed, offeeOrigin, pathWithHomebrew } from './window-policy.ts'
+import { isAllowedRequestUrl, isOffeeUrl, isPermissionAllowed, offeeOrigin, pathWithHomebrew, unreachableProxy } from './window-policy.ts'
 
 const distDirectory = dirname(fileURLToPath(import.meta.url))
 const launcherPath = app.isPackaged ? join(process.resourcesPath, 'offee', 'bin', 'offee') : join(app.getAppPath(), '..', '..', 'bin', 'offee')
@@ -36,7 +36,9 @@ const runtime: {
   controlWindow: BrowserWindow | null
   askedRequestIds: Set<string>
   reviewing: boolean
+  polling: boolean
   errorShown: boolean
+  longRunningLauncher: AbortController | null
 } = {
   state: { phase: 'checking', gateway: null, hasAnthropicKey: false, message: null },
   tray: null,
@@ -44,7 +46,9 @@ const runtime: {
   controlWindow: null,
   askedRequestIds: new Set(),
   reviewing: false,
+  polling: false,
   errorShown: false,
+  longRunningLauncher: null,
 }
 
 // Everything the launcher prints and every error lands here, so a failure on someone's Mac
@@ -90,8 +94,27 @@ const launcher = (args: string[], stdin?: string) => {
   return runLauncher(args, { launcherPath, onOutput: sendLog, ...(stdin === undefined ? {} : { stdin }) })
 }
 
+// Setup and start can run for many minutes; only one runs at a time, and stopping Offee or
+// quitting the app stops it.
+const cancellableLauncher = async (args: string[]) => {
+  const controller = new AbortController()
+  runtime.longRunningLauncher = controller
+  writeLog(`${new Date().toISOString()} offee ${args[0] ?? ''}`)
+  const result = await runLauncher(args, { launcherPath, onOutput: sendLog, signal: controller.signal })
+  if (runtime.longRunningLauncher === controller) runtime.longRunningLauncher = null
+  return { ...result, cancelled: controller.signal.aborted }
+}
+
+const cancelLongRunningLauncher = (): void => {
+  runtime.longRunningLauncher?.abort()
+  runtime.longRunningLauncher = null
+}
+
+const quietCallTimeoutMilliseconds = 10_000
+
 // Polling output stays out of the log window, which would otherwise fill with status lines.
-const quietLauncher = (args: string[]) => runLauncher(args, { launcherPath })
+// A VM that hangs must not leave a call behind every few seconds, so each one is cut short.
+const quietLauncher = (args: string[]) => runLauncher(args, { launcherPath, signal: AbortSignal.timeout(quietCallTimeoutMilliseconds) })
 
 const toMenuItem = (entry: TrayEntry): MenuItemConstructorOptions => {
   if (entry.type === 'separator') return { type: 'separator' }
@@ -144,6 +167,9 @@ const openOffeeWindow = (): void => {
   const offeeSession = session.fromPartition('persist:offee')
   allowOnlySafePermissions(offeeSession)
   offeeSession.webRequest.onBeforeRequest((details, callback) => callback({ cancel: !isAllowedRequestUrl(details.url) }))
+  // WebRTC and DNS prefetching pass beside webRequest. A proxy that leads nowhere stops both:
+  // the page's own origin is loopback, which Chromium never sends through a proxy.
+  const sealSession = offeeSession.setProxy({ proxyRules: unreachableProxy })
   const window = new BrowserWindow({
     width: 1320,
     height: 880,
@@ -155,7 +181,10 @@ const openOffeeWindow = (): void => {
   })
   runtime.offeeWindow = window
   watchForPageFailures(window, 'Offee')
-  window.loadURL(offeeOrigin).catch((error: unknown) => {
+  window.webContents.setWebRTCIPHandlingPolicy('disable_non_proxied_udp')
+  sealSession
+    .then(() => window.loadURL(offeeOrigin))
+    .catch((error: unknown) => {
     writeLog(`${new Date().toISOString()} Offee did not answer: ${describeError(error)}`)
     window.close()
     updateState({ phase: 'failed', message: `Offee did not answer at ${offeeOrigin}. Try starting it again; the log is in ${logFile}.` })
@@ -193,7 +222,23 @@ const reportSmokeTest = async (window: BrowserWindow): Promise<void> => {
   )
   const rendered = typeof page === 'string' && page.includes('"bridge":"object"') && page.includes('Set up Offee')
   process.stdout.write(`smoke: settings window ${rendered ? 'rendered' : 'did not render'}: ${String(page)}\n`)
-  app.exit(rendered ? 0 : 1)
+  if (!rendered) {
+    app.exit(1)
+    return
+  }
+  // CI serves a stand-in page on the Offee port: the window must load it through its sealed
+  // session and still be unable to reach anything else.
+  openOffeeWindow()
+  runtime.offeeWindow?.webContents.once('did-finish-load', () => void reportOffeeWindowSmokeTest())
+}
+
+const reportOffeeWindowSmokeTest = async (): Promise<void> => {
+  const page: unknown = await runtime.offeeWindow?.webContents.executeJavaScript(
+    "fetch('https://example.com/', { mode: 'no-cors' }).then(() => 'reached', () => 'blocked').then((outside) => JSON.stringify({ outside, text: document.body.innerText.slice(0, 100) }))",
+  )
+  const sealed = typeof page === 'string' && page.includes('Offee stand-in') && page.includes('"outside":"blocked"')
+  process.stdout.write(`smoke: Offee window ${sealed ? 'loaded and sealed' : 'failed'}: ${String(page)}\n`)
+  app.exit(sealed ? 0 : 1)
 }
 
 const describeFailure = (output: string): string =>
@@ -210,7 +255,7 @@ const runSetup = async (): Promise<void> => {
       'This will:',
       '• install Colima and the Docker command-line tools with Homebrew, if they are missing',
       '• create a Linux virtual machine that shares no folder with your Mac',
-      '• download the local models, about 4 GB',
+      '• download the local models and images, about 10 GB',
       '',
       'It takes 10 to 30 minutes. Nothing you add to Offee later leaves the machine unless you open the switch.',
     ].join('\n'),
@@ -220,7 +265,8 @@ const runSetup = async (): Promise<void> => {
   })
   if (response !== 1) return
   updateState({ phase: 'setting-up', message: null })
-  const result = await launcher(['setup'])
+  const result = await cancellableLauncher(['setup'])
+  if (result.cancelled) return
   if (result.exitCode === 0) {
     updateState({ phase: 'running', message: null })
     openOffeeWindow()
@@ -232,7 +278,8 @@ const runSetup = async (): Promise<void> => {
 
 const start = async (): Promise<void> => {
   updateState({ phase: 'starting', message: null })
-  const result = await launcher(['start'])
+  const result = await cancellableLauncher(['start'])
+  if (result.cancelled) return
   if (result.exitCode === 0) {
     updateState({ phase: 'running', message: null })
     openOffeeWindow()
@@ -244,6 +291,7 @@ const start = async (): Promise<void> => {
 
 const stop = async (): Promise<void> => {
   updateState({ phase: 'stopping' })
+  cancelLongRunningLauncher()
   runtime.offeeWindow?.close()
   await launcher(['stop'])
   updateState({ phase: 'stopped', gateway: null })
@@ -285,10 +333,15 @@ const reviewRequests = async (): Promise<void> => {
 }
 
 const pollGateway = async (): Promise<void> => {
-  if (runtime.state.phase !== 'running') return
-  const gateway = parseStatusReply((await quietLauncher(['ctl', '--json', 'status'])).output)
-  updateState({ gateway })
-  if (gateway?.mode === 'ask' && gateway.pendingCount > 0) await reviewRequests()
+  if (runtime.state.phase !== 'running' || runtime.polling) return
+  runtime.polling = true
+  try {
+    const gateway = parseStatusReply((await quietLauncher(['ctl', '--json', 'status'])).output)
+    updateState({ gateway })
+    if (gateway?.mode === 'ask' && gateway.pendingCount > 0) await reviewRequests()
+  } finally {
+    runtime.polling = false
+  }
 }
 
 const runSelftest = async (): Promise<void> => {
@@ -364,9 +417,12 @@ const createTray = (): void => {
   refreshTray()
 }
 
-// Quitting stops the VM in the background so the app can close at once.
+// Quitting stops the VM in the background so the app can close at once. A setup that failed or
+// is still running has a VM too, and possibly a download, so only a VM that was never created or
+// is already stopped is left alone.
 const stopInBackground = (): void => {
-  if (runtime.state.phase !== 'running') return
+  cancelLongRunningLauncher()
+  if (runtime.state.phase === 'needs-setup' || runtime.state.phase === 'stopped') return
   const child = spawn(launcherPath, ['stop'], {
     detached: true,
     stdio: 'ignore',
@@ -385,7 +441,7 @@ app.on('before-quit', stopInBackground)
 if (smokeTest) {
   process.stdout.write('smoke: starting\n')
   setTimeout(() => {
-    process.stderr.write('smoke: the settings window did not finish loading within 40 seconds\n')
+    process.stderr.write('smoke: the windows did not finish loading within 40 seconds\n')
     app.exit(1)
   }, 40_000)
 }

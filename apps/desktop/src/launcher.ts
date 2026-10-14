@@ -6,13 +6,24 @@ export type LauncherOptions = {
   launcherPath: string
   onOutput?: (text: string) => void
   stdin?: string
+  signal?: AbortSignal
+}
+
+const stopProcessGroup = (pid: number | undefined): void => {
+  if (pid === undefined) return
+  try {
+    process.kill(-pid, 'SIGTERM')
+  } catch {
+    // The launcher has already finished.
+  }
 }
 
 /**
  * Runs `bin/offee` with the arguments given. Values reach it through its environment and
  * standard input only, never its arguments, so a key never shows in a process listing.
  * @param args The launcher command and its arguments.
- * @param options Where the launcher is, where its output goes, and what to send on stdin.
+ * @param options Where the launcher is, where its output goes, what to send on stdin, and a
+ * signal that stops it.
  * @returns The exit code and everything it printed.
  */
 export const runLauncher = (args: string[], options: LauncherOptions): Promise<LauncherResult> =>
@@ -20,7 +31,10 @@ export const runLauncher = (args: string[], options: LauncherOptions): Promise<L
     const child = spawn(options.launcherPath, args, {
       env: { ...process.env, PATH: pathWithHomebrew(process.env.PATH), OFFEE_YES: '1', OFFEE_NO_BROWSER: '1' },
       stdio: ['pipe', 'pipe', 'pipe'],
+      // Its own process group, so stopping it also stops the docker and sleep commands it runs.
+      detached: true,
     })
+    options.signal?.addEventListener('abort', () => stopProcessGroup(child.pid), { once: true })
     const chunks: string[] = []
     const collect = (data: Buffer) => {
       const text = progressAsLines(data.toString('utf8'))

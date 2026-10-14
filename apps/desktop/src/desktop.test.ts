@@ -57,6 +57,13 @@ describe('the menu bar', () => {
     expect(labels(trayEntries('running', { mode: 'ask', openUntil: null, pendingCount: 2 }, 0))).toContain('Review 2 waiting request(s)…')
   })
 
+  it('stops a setup, a start or a failed attempt, which can all leave the VM running', () => {
+    expect(labels(trayEntries('setting-up', null, 0))).toContain('Cancel setup')
+    expect(labels(trayEntries('starting', null, 0))).toContain('Stop Offee')
+    expect(labels(trayEntries('failed', null, 0))).toEqual(expect.arrayContaining(['Start Offee', 'Stop Offee']))
+    expect(labels(trayEntries('needs-setup', null, 0))).not.toContain('Stop Offee')
+  })
+
   it('opens Offee only when it runs', () => {
     const openEntry = trayEntries('stopped', null, 0).find((entry) => entry.type === 'action' && entry.label === 'Open Offee')
     expect(openEntry).toMatchObject({ enabled: false })
