@@ -70,13 +70,35 @@ jobs:
             apps/desktop/build/Offee-arm64.dmg
             apps/desktop/build/first-launch.png
 
-      # A rolling pre-release, so the newest disk image always has the same download page.
+  # A rolling pre-release, so the newest disk image always has the same download page. Several
+  # pull requests can build at once: their publishes take turns, and a build never replaces one
+  # that already contains it, so the download stays the newest of a stack of pull requests.
+  publish:
+    needs: package
+    runs-on: ubuntu-latest
+    concurrency:
+      group: mac-preview-release
+      cancel-in-progress: false
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: Offee-arm64
+          path: dist
       - name: Publish the preview
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
           TARGET: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
+          current="$(gh release view mac-preview --json targetCommitish --jq .targetCommitish 2>/dev/null || true)"
+          if [ -n "$current" ]; then
+            relation="$(gh api "repos/$GH_REPO/compare/$TARGET...$current" --jq .status 2>/dev/null || true)"
+            if [ "$relation" = "ahead" ] || [ "$relation" = "identical" ]; then
+              echo "mac-preview is built from $current, which already contains $TARGET"
+              exit 0
+            fi
+          fi
           gh release delete mac-preview --yes --cleanup-tag || true
-          gh release create mac-preview apps/desktop/build/Offee-arm64.dmg \
+          gh release create mac-preview dist/Offee-arm64.dmg \
             --prerelease --target "$TARGET" --title "Offee for Mac (preview)" \
             --notes "Built from $TARGET. Apple Silicon only. Not notarized: the first time, right-click Offee in Applications and choose Open (on macOS 15, allow it in System Settings, Privacy & Security)."
