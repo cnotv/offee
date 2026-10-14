@@ -1,0 +1,25 @@
+body {
+  margin: 0;
+  -webkit-font-smoothing: antialiased;
+}
+
+.control-page {
+  padding: var(--space-5);
+}
+
+.control-log {
+  height: 240px;
+  overflow: auto;
+  padding: var(--space-2);
+  border-radius: var(--radius-2);
+  background: var(--gray-a2);
+  font-family: var(--code-font-family);
+  font-size: var(--font-size-1);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* Failure messages list one problem per line. */
+.control-message {
+  white-space: pre-line;
+}

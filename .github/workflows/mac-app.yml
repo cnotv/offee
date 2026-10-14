@@ -1,0 +1,104 @@
+name: Mac app
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @offee/desktop build
+      - run: pnpm --filter @offee/desktop package:mac
+
+      # macOS's own Bash is 3.2, older than the one on Linux runners; the app runs the launcher
+      # with it, so the launcher is exercised with it here, against a stand-in Docker CLI.
+      - name: Launcher on macOS Bash
+        run: |
+          stub="$RUNNER_TEMP/stub-bin"
+          mkdir -p "$stub"
+          printf '%s\n' '#!/bin/sh' 'case "$*" in *"ctl.ts --json status"*) echo "{\"ok\":true}";; ps*) ;; *) echo "docker $*";; esac' > "$stub/docker"
+          chmod +x "$stub/docker"
+          /bin/bash --version | head -1
+          out="$(PATH="$stub:$PATH" OFFEE_HOME="$RUNNER_TEMP/offee-home" OFFEE_RUNTIME=docker /bin/bash bin/offee ctl --json status < /dev/null)"
+          echo "$out"
+          [ "$out" = '{"ok":true}' ]
+          # The machine check uses macOS's own tools (sw_vers, sysctl, df, lsof); the runner may
+          # lack the memory Offee needs, so only a clean run of the check itself is required.
+          check="$(PATH="$stub:$PATH" OFFEE_HOME="$RUNNER_TEMP/offee-home" OFFEE_RUNTIME=docker /bin/bash bin/offee check < /dev/null 2>&1 || true)"
+          echo "$check"
+          echo "$check" | grep -q "ok    macOS"
+          echo "$check" | grep -q "the download sites answer"
+          # Nothing listens on the Offee port yet, so this runs lsof finding nothing.
+          echo "$check" | grep -q "port 8470 is free"
+          ! echo "$check" | grep -q "stopped unexpectedly"
+          ! echo "$check" | grep -qE "line [0-9]+:|unbound variable|syntax error"
+
+      # Opens the packaged app with an empty state: the settings window must render through its
+      # preload, which the app checks itself and reports before quitting.
+      - name: Smoke test
+        run: |
+          app="apps/desktop/build/out/Offee-darwin-arm64/Offee.app/Contents/MacOS/Offee"
+          mkdir -p "$RUNNER_TEMP/standin"
+          echo '<!doctype html><title>Offee</title><p>Offee stand-in</p>' > "$RUNNER_TEMP/standin/index.html"
+          python3 -m http.server 8470 --bind 127.0.0.1 --directory "$RUNNER_TEMP/standin" > /dev/null 2>&1 &
+          OFFEE_HOME="$RUNNER_TEMP/offee-home" OFFEE_SMOKE_TEST=1 perl -e 'alarm 60; exec @ARGV' "$app" 2>&1 | tee "$RUNNER_TEMP/offee.log" || true
+          cat "$HOME/Library/Logs/Offee/offee.log" 2>/dev/null || true
+          grep -q "smoke: settings window rendered" "$RUNNER_TEMP/offee.log"
+          grep -q "smoke: Offee window loaded and sealed" "$RUNNER_TEMP/offee.log"
+          kill %1 || true
+          OFFEE_HOME="$RUNNER_TEMP/offee-home" "$app" > /dev/null 2>&1 &
+          sleep 15
+          screencapture -x apps/desktop/build/first-launch.png || true
+          kill $!
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Offee-arm64
+          path: |
+            apps/desktop/build/Offee-arm64.dmg
+            apps/desktop/build/first-launch.png
+
+  # A rolling pre-release, so the newest disk image always has the same download page. Several
+  # pull requests can build at once: their publishes take turns, and a build never replaces one
+  # that already contains it, so the download stays the newest of a stack of pull requests.
+  publish:
+    needs: package
+    runs-on: ubuntu-latest
+    concurrency:
+      group: mac-preview-release
+      cancel-in-progress: false
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: Offee-arm64
+          path: dist
+      - name: Publish the preview
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TARGET: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          current="$(gh release view mac-preview --json targetCommitish --jq .targetCommitish 2>/dev/null || true)"
+          if [ -n "$current" ]; then
+            relation="$(gh api "repos/$GH_REPO/compare/$TARGET...$current" --jq .status 2>/dev/null || true)"
+            if [ "$relation" = "ahead" ] || [ "$relation" = "identical" ]; then
+              echo "mac-preview is built from $current, which already contains $TARGET"
+              exit 0
+            fi
+          fi
+          gh release delete mac-preview --yes --cleanup-tag || true
+          gh release create mac-preview dist/Offee-arm64.dmg \
+            --prerelease --target "$TARGET" --title "Offee for Mac (preview)" \
+            --notes "Built from $TARGET. Apple Silicon only. Not notarized: the first time, right-click Offee in Applications and choose Open (on macOS 15, allow it in System Settings, Privacy & Security)."

@@ -94,8 +94,34 @@ Nothing found does all of this; these do parts of it and are reused or copied wh
 
 ## Try it
 
+### The Mac app
+
 On a Mac with Apple Silicon (macOS 13 or later, 16 GB of memory or more) with
 [Homebrew](https://brew.sh):
+
+1. Download `Offee-arm64.dmg` from the
+   [Mac preview release](https://github.com/cnotv/offee/releases/tag/mac-preview) and drag Offee to
+   Applications.
+2. The app is not notarized yet, so the first time right-click it and choose **Open** (on
+   macOS 15: open it once, then allow it in System Settings, Privacy & Security).
+3. Choose **Set up Offee**. When setup finishes, Offee opens in its own window.
+
+The menu bar icon holds the switch. In **Ask** mode every outbound request appears as a Mac
+dialog showing exactly what would be sent; the page inside the VM can neither draw nor answer
+that dialog. **Settings and setup…** stores the Anthropic key, runs the isolation check, and
+starts or stops the VM. Quitting the app stops the VM. When something goes wrong, **Show log
+file** in the same menu opens `~/Library/Logs/Offee/offee.log`, which holds every launcher run
+and error.
+
+The window that shows Offee is a locked-down browser: no Node.js, no bridge to the app, no
+permissions but copying text, and no request, link or navigation off `127.0.0.1:8470`. That
+last part matters: the page comes from the VM but runs on the Mac, which has a network. In an
+ordinary browser a compromised app could send data out from the page itself, around the
+gateway; the Mac app's window cannot, because the host blocks it, not the page.
+
+### From the terminal
+
+The same, without the app:
 
 ```sh
 gh repo clone cnotv/offee
@@ -147,6 +173,7 @@ then `offee switch ask` and `offee watch` in a second terminal.
 pnpm install
 pnpm dev        # API on 8470 (expects the model servers), UI on 5319
 pnpm lint --max-warnings 0 && pnpm typecheck && pnpm test
+pnpm --filter @offee/desktop start   # the Mac app, against the launcher in this checkout
 ```
 
 ## Status

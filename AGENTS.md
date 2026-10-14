@@ -105,8 +105,12 @@ line in the body when the change is not on the default route, and `Preview click
   tool, imported files and the model manifest.
 
 - **The UI is React with Radix Themes**, tables are TanStack Table on Radix `Table`, and the only
-  app CSS is `apps/web/src/styles.css`. Types shared by server, gateway and web live in
+  app CSS is `apps/web/src/styles.css` (and `apps/desktop/control/src/styles.css` for the Mac
+  app's settings window). Types shared by server, gateway and web live in
   `packages/contracts/src/types.ts`.
+- **The Mac app's Offee window stays unprivileged**: sandboxed, no preload, no IPC, navigation
+  fixed to `http://127.0.0.1:8470`. Only the bundled settings page may call the main process,
+  and the main process validates every call.
 
 ## Project facts
 
@@ -116,6 +120,8 @@ line in the body when the change is not on the default route, and `Preview click
 - **Routes:** `/chat` (default), `/reply`, `/translate`, `/review`, `/forms`, `/library`,
   `/profiles`, `/personas`, `/runs`
 - **Checks:** `pnpm lint --max-warnings 0`, `pnpm typecheck`, `pnpm test`, `shellcheck bin/offee`
+- **Mac app:** `pnpm --filter @offee/desktop start` runs it; the `Mac app` workflow packages
+  `Offee-arm64.dmg` on macOS and publishes it as the `mac-preview` pre-release
 - **Docs home:** `README.md`
 - **Preview deploys:** none
 - **Security:** the threat model is the "Isolation" section of `README.md`
