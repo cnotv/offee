@@ -56,6 +56,7 @@ export const workflowContextSchema = z.object({
 })
 
 export const chatRequestSchema = workflowContextSchema.extend({
+  conversationId: z.uuid(),
   history: z.array(z.object({ role: z.enum(['user', 'assistant']), content: z.string().max(50_000) })).max(40),
   message: z.string().trim().min(1).max(50_000),
 })

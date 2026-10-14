@@ -1,5 +1,7 @@
+import { ResumeIcon } from '@radix-ui/react-icons'
 import { Badge, Button, Callout, Dialog, Flex, Text } from '@radix-ui/themes'
-import { useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router'
 import type { ColumnDef } from '@tanstack/react-table'
 import type { RunDetail, RunSummary } from '@offee/contracts'
 import { ErrorCallout } from '@/components/ErrorCallout'
@@ -8,10 +10,14 @@ import type { sortableTableFeatures } from '@/components/tables/sortable-table-f
 import { ModelBadge } from '@/components/WorkflowResultCard'
 import { useAction } from '@/hooks/useAction'
 import { useLoad } from '@/hooks/useLoad'
+import { useContinuation } from '@/hooks/useWorkflowPages'
 import { api } from '@/lib/api'
+import { canContinue, continuationOf } from '@/lib/continue-run'
 import { formatTime, workflowName } from '@/lib/presentation'
 
-const RunDialog = ({ run, onClose }: { run: RunDetail; onClose: () => void }) => (
+type RunDialogProps = { run: RunDetail; onClose: () => void; onContinue: () => void }
+
+const RunDialog = ({ run, onClose, onContinue }: RunDialogProps) => (
   <Dialog.Root open onOpenChange={(open) => (open ? undefined : onClose())}>
     <Dialog.Content maxWidth="820px">
       <Dialog.Title>{run.title}</Dialog.Title>
@@ -55,10 +61,15 @@ const RunDialog = ({ run, onClose }: { run: RunDetail; onClose: () => void }) =>
             {run.output}
           </Text>
         </Flex>
-        <Flex justify="end">
+        <Flex justify="end" gap="2">
           <Button variant="soft" color="gray" onClick={onClose}>
             Close
           </Button>
+          {canContinue(run.workflow) && (
+            <Button onClick={onContinue}>
+              <ResumeIcon /> Continue
+            </Button>
+          )}
         </Flex>
       </Flex>
     </Dialog.Content>
@@ -70,6 +81,21 @@ export const RunsView = () => {
   const runs = useLoad(api.runs)
   const [open, setOpen] = useState<RunDetail | null>(null)
   const action = useAction()
+  const runAction = action.run
+  const { open: openPage, empty } = useContinuation()
+  const navigate = useNavigate()
+
+  // A chat brings back its whole conversation; any other run, itself.
+  const continueRun = useCallback(
+    (id: string) =>
+      runAction(async () => {
+        const next = continuationOf(await api.runConversation(id), empty())
+        if (next === null) return
+        openPage(next)
+        await navigate(`/${next.page}`)
+      }),
+    [runAction, empty, openPage, navigate],
+  )
 
   const columns = useMemo<ColumnDef<typeof sortableTableFeatures, RunSummary, unknown>[]>(
     () => [
@@ -93,6 +119,17 @@ export const RunsView = () => {
         cell: (context) => (context.row.original.model === null ? '—' : <ModelBadge model={context.row.original.model} />),
       },
       {
+        id: 'continue',
+        header: '',
+        enableSorting: false,
+        cell: (context) =>
+          canContinue(context.row.original.workflow) ? (
+            <Button variant="soft" size="1" onClick={() => continueRun(context.row.original.id)}>
+              <ResumeIcon /> Continue
+            </Button>
+          ) : null,
+      },
+      {
         id: 'left',
         accessorFn: (row) => (row.leftMachine ? 1 : 0),
         header: 'Left the machine',
@@ -109,7 +146,7 @@ export const RunsView = () => {
           ),
       },
     ],
-    [action],
+    [action, continueRun],
   )
 
   return (
@@ -122,7 +159,7 @@ export const RunsView = () => {
       ) : (
         <SortableTable columns={columns} rows={runs.value ?? []} rowKeyOf={(row) => row.id} numericColumnIds={[]} />
       )}
-      {open !== null && <RunDialog run={open} onClose={() => setOpen(null)} />}
+      {open !== null && <RunDialog run={open} onClose={() => setOpen(null)} onContinue={() => continueRun(open.id)} />}
     </Flex>
   )
 }

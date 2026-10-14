@@ -69,6 +69,9 @@ const setUp = (remoteOutcome: Awaited<ReturnType<RemoteModel['complete']>>) => {
   return { request, postJson, localRequests, remoteRequests, stores }
 }
 
+const firstConversation = '0f8fad5b-d9cb-469f-a165-70867728950e'
+const secondConversation = '7c9e6679-7425-40de-944b-e07fc1f90ae7'
+
 describe('the request guard', () => {
   it('refuses an unknown Host and a cross-origin mutation', async () => {
     const { request } = setUp({ ok: false, reason: 'sealed', reachedProvider: false })
@@ -86,7 +89,7 @@ describe('chat over documents', () => {
     expect((await request('/api/documents', { method: 'POST', body: upload })).status).toBe(201)
 
     const persona = await parse(await postJson('/api/personas', { name: 'Helper', instructions: 'Be brief.', modelPreference: 'local' }), idSchema)
-    const response = await postJson('/api/chat', { profileId: null, personaId: persona.id, history: [], message: 'When does the office close on Fridays?' })
+    const response = await postJson('/api/chat', { profileId: null, personaId: persona.id, conversationId: firstConversation, history: [], message: 'When does the office close on Fridays?' })
     const answer = await parse(response, answerSchema)
 
     expect(answer.text).toBe('Local answer [1]')
@@ -101,11 +104,37 @@ describe('chat over documents', () => {
   })
 })
 
+describe('continuing a conversation', () => {
+  it('returns every exchange of the conversation a run belongs to, and nothing of another', async () => {
+    const { request, postJson } = setUp({ ok: false, reason: 'unused', reachedProvider: false })
+    const ask = async (conversationId: string, message: string) =>
+      parse(await postJson('/api/chat', { profileId: null, personaId: null, conversationId, history: [], message }), answerSchema)
+    await ask(firstConversation, 'First question')
+    await ask(secondConversation, 'Elsewhere')
+    const last = await ask(firstConversation, 'Second question')
+
+    const conversation = await parse(await request(`/api/runs/${last.runId}/conversation`), z.array(z.object({ input: z.string(), conversationId: z.string() })))
+    expect(conversation.map((run) => run.input)).toEqual(['First question', 'Second question'])
+    expect(new Set(conversation.map((run) => run.conversationId))).toEqual(new Set([firstConversation]))
+  })
+
+  it('refuses a chat without a well-formed conversation id', async () => {
+    const { postJson } = setUp({ ok: false, reason: 'unused', reachedProvider: false })
+    const response = await postJson('/api/chat', { profileId: null, personaId: null, conversationId: 'not-an-id', history: [], message: 'Hi' })
+    expect(response.status).toBe(400)
+  })
+
+  it('answers 404 for an unknown run', async () => {
+    const { request } = setUp({ ok: false, reason: 'unused', reachedProvider: false })
+    expect((await request('/api/runs/missing/conversation')).status).toBe(404)
+  })
+})
+
 describe('remote personas', () => {
   it('falls back to the local model when the gateway refuses, and records the refusal', async () => {
     const { postJson, request, remoteRequests } = setUp({ ok: false, reason: 'The switch is sealed', reachedProvider: false })
     const persona = await parse(await postJson('/api/personas', { name: 'Remote', instructions: '', modelPreference: 'remote' }), idSchema)
-    const answer = await parse(await postJson('/api/chat', { profileId: null, personaId: persona.id, history: [], message: 'Hello there' }), answerSchema)
+    const answer = await parse(await postJson('/api/chat', { profileId: null, personaId: persona.id, conversationId: firstConversation, history: [], message: 'Hello there' }), answerSchema)
 
     expect(remoteRequests).toHaveLength(1)
     expect(answer.model).toEqual({ kind: 'local', name: 'gemma-test', fallbackReason: 'The switch is sealed' })
@@ -117,7 +146,7 @@ describe('remote personas', () => {
   it('uses the remote answer when the gateway lets it through', async () => {
     const { postJson } = setUp({ ok: true, text: 'Remote answer', model: 'claude-opus-5-5' })
     const persona = await parse(await postJson('/api/personas', { name: 'Remote', instructions: '', modelPreference: 'remote' }), idSchema)
-    const answer = await parse(await postJson('/api/chat', { profileId: null, personaId: persona.id, history: [], message: 'Hello there' }), answerSchema)
+    const answer = await parse(await postJson('/api/chat', { profileId: null, personaId: persona.id, conversationId: firstConversation, history: [], message: 'Hello there' }), answerSchema)
     expect(answer.text).toBe('Remote answer')
     expect(answer.model.kind).toBe('remote')
   })

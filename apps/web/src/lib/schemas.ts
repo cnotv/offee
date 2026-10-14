@@ -99,6 +99,7 @@ export const runSummarySchema = z.object({
 })
 
 export const runDetailSchema = runSummarySchema.extend({
+  conversationId: z.string().nullable(),
   input: z.string(),
   output: z.string(),
   outbound: z.array(outboundRecordSchema),

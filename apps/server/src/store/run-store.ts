@@ -13,6 +13,7 @@ const runRowSchema = z.object({
   output: z.string(),
   outbound: z.string(),
   created_at: z.number(),
+  conversation_id: z.string().nullable(),
 })
 
 const storedTextLimit = 200_000
@@ -27,6 +28,7 @@ const toDetail = (row: unknown): RunDetail => {
     model: parsed.model === null ? null : modelUsedSchema.parse(JSON.parse(parsed.model)),
     leftMachine: outbound.some((record) => record.outcome === 'sent'),
     createdAt: parsed.created_at,
+    conversationId: parsed.conversation_id,
     input: parsed.input,
     output: parsed.output,
     outbound,
@@ -49,6 +51,8 @@ export type RunRecord = {
   input: string
   output: string
   outbound: OutboundRecord[]
+  /** Only chat runs belong to a conversation. */
+  conversationId?: string
 }
 
 export type RunStore = ReturnType<typeof createRunStore>
@@ -63,7 +67,7 @@ export const createRunStore = (database: DatabaseSync, now: () => number) => ({
   record: (run: RunRecord): string => {
     const id = randomUUID()
     database
-      .prepare('INSERT INTO runs (id, workflow, title, model, input, output, outbound, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+      .prepare('INSERT INTO runs (id, workflow, title, model, input, output, outbound, created_at, conversation_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
       .run(
         id,
         run.workflow,
@@ -73,6 +77,7 @@ export const createRunStore = (database: DatabaseSync, now: () => number) => ({
         run.output.slice(0, storedTextLimit),
         JSON.stringify(run.outbound),
         now(),
+        run.conversationId ?? null,
       )
     return id
   },
@@ -81,5 +86,18 @@ export const createRunStore = (database: DatabaseSync, now: () => number) => ({
   get: (id: string): RunDetail | undefined => {
     const row = database.prepare('SELECT * FROM runs WHERE id = ?').get(id)
     return row === undefined ? undefined : toDetail(row)
+  },
+  /**
+   * Every run of the conversation a run belongs to, oldest first; a run outside any
+   * conversation stands alone.
+   * @param id Any run of the conversation.
+   * @returns The runs, or undefined when there is no such run.
+   */
+  conversationOf: (id: string): RunDetail[] | undefined => {
+    const row = database.prepare('SELECT * FROM runs WHERE id = ?').get(id)
+    if (row === undefined) return undefined
+    const run = toDetail(row)
+    if (run.conversationId === null) return [run]
+    return database.prepare('SELECT * FROM runs WHERE conversation_id = ? ORDER BY created_at, rowid').all(run.conversationId).map(toDetail)
   },
 })

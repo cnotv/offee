@@ -87,5 +87,6 @@ export const api = {
   fillForm: (request: FormFillRequest) => sendJson('POST', '/api/forms/fill', request, formFillResultSchema),
   runs: () => getJson('/api/runs', z.array(runSummarySchema)),
   run: (id: string) => getJson(`/api/runs/${id}`, runDetailSchema),
+  runConversation: (id: string) => getJson(`/api/runs/${id}/conversation`, z.array(runDetailSchema)),
   fileUrl: (id: string) => `/api/files/${id}`,
 }

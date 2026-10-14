@@ -75,6 +75,8 @@ export type ChatTurn = {
 }
 
 export type ChatRequest = WorkflowContext & {
+  /** Chosen by the page when a conversation starts; every exchange in it carries the same id. */
+  conversationId: string
   history: ChatTurn[]
   message: string
 }
@@ -183,6 +185,8 @@ export type RunSummary = {
 }
 
 export type RunDetail = RunSummary & {
+  /** The chat conversation the run belongs to; null for other workflows and older chats. */
+  conversationId: string | null
   input: string
   output: string
   outbound: OutboundRecord[]
