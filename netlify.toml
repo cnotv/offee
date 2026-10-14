@@ -1,0 +1,23 @@
+# Netlify hosts only the static UI. With no Offee server behind it, the build runs in demo mode:
+# sample data and canned answers that live in the browser tab, so nothing typed there is sent.
+[build]
+  command = "pnpm --filter @offee/web build"
+  publish = "apps/web/dist"
+
+[build.environment]
+  NODE_VERSION = "24"
+  VITE_DEMO_MODE = "1"
+  # The Mac app's Electron is a dependency of the workspace, not of the UI.
+  ELECTRON_SKIP_BINARY_DOWNLOAD = "1"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Content-Security-Policy = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+    Referrer-Policy = "no-referrer"
+    X-Content-Type-Options = "nosniff"

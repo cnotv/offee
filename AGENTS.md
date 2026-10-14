@@ -132,7 +132,8 @@ hand is an MP4, never a GIF.
 - **Mac app:** `pnpm --filter @offee/desktop start` runs it; the `Mac app` workflow packages
   `Offee-arm64.dmg` on macOS and publishes it as the `mac-preview` pre-release
 - **Docs home:** `README.md`
-- **Preview deploys:** none
+- **Preview deploys:** Netlify builds the UI in demo mode for every pull request (`netlify.toml`;
+  the URL is in the Netlify bot comment). No server behind it.
 - **Security:** the threat model is the "Isolation" section of `README.md`
 - **Scoped rules:** none yet
 - **Local skills:** none
