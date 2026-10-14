@@ -28,7 +28,7 @@ jobs:
         run: |
           stub="$RUNNER_TEMP/stub-bin"
           mkdir -p "$stub"
-          printf '%s\n' '#!/bin/sh' 'case "$*" in *"ctl.ts --json status"*) echo "{\"ok\":true}";; *) echo "docker $*";; esac' > "$stub/docker"
+          printf '%s\n' '#!/bin/sh' 'case "$*" in *"ctl.ts --json status"*) echo "{\"ok\":true}";; ps*) ;; *) echo "docker $*";; esac' > "$stub/docker"
           chmod +x "$stub/docker"
           /bin/bash --version | head -1
           out="$(PATH="$stub:$PATH" OFFEE_HOME="$RUNNER_TEMP/offee-home" OFFEE_RUNTIME=docker /bin/bash bin/offee ctl --json status < /dev/null)"
@@ -40,6 +40,9 @@ jobs:
           echo "$check"
           echo "$check" | grep -q "ok    macOS"
           echo "$check" | grep -q "the download sites answer"
+          # Nothing listens on the Offee port yet, so this runs lsof finding nothing.
+          echo "$check" | grep -q "port 8470 is free"
+          ! echo "$check" | grep -q "stopped unexpectedly"
           ! echo "$check" | grep -qE "line [0-9]+:|unbound variable|syntax error"
 
       # Opens the packaged app with an empty state: the settings window must render through its

@@ -77,8 +77,11 @@ describe('explaining a failed setup', () => {
     expect(describeFailure(output, '/log')).toBe('This Mac is not ready for Offee yet:\n• Setup needs 25 GB free on disk; there are 12 GB\n• cannot reach ghcr.io')
   })
 
-  it('points to the log for anything else', () => {
-    expect(describeFailure('compose failed', '/log')).toContain('/log')
+  it("gives the launcher's own reason, and the log", () => {
+    expect(describeFailure('Starting\noffee: Offee is not set up on this machine: its VM is missing. Run setup\n', '/log')).toBe(
+      'Offee is not set up on this machine: its VM is missing. Run setup\nThe full log is in /log.',
+    )
+    expect(describeFailure('compose failed', '/log')).toBe('Something failed. The full log is in /log.')
   })
 })
 
