@@ -187,6 +187,8 @@ const openOffeeWindow = (): void => {
     .then(() => window.loadURL(offeeOrigin))
     .catch((error: unknown) => {
     writeLog(`${new Date().toISOString()} Offee did not answer: ${describeError(error)}`)
+    // Closing the window or quitting the app also ends the load; then there is nothing to report.
+    if (window.isDestroyed()) return
     window.close()
     updateState({ phase: 'failed', message: `Offee did not answer at ${offeeOrigin}. Try starting it again; the log is in ${logFile}.` })
     openControlWindow()
