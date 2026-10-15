@@ -3,6 +3,8 @@ import type {
   FormFillRequest,
   FormFillResult,
   FormInspection,
+  Persona,
+  PlacedField,
   ProfileReading,
   ReplyRequest,
   ReviewRequest,
@@ -16,6 +18,7 @@ import { textToDocx } from '../exports/docx-export.ts'
 import { createSigningCertificate } from '../forms/certificate.ts'
 import type { FieldAliases } from '../forms/match-fields.ts'
 import { suggestFromProfile } from '../forms/match-fields.ts'
+import { addPlacedFields, fieldPlacementSchemaFor, fieldPlacementsFromModelAnswer, readTextLines } from '../forms/flat-form.ts'
 import { fillForm, readFormFields } from '../forms/pdf-form.ts'
 import { chunkText } from '../knowledge/chunk-text.ts'
 import type { Generation, Models } from '../llm/generate.ts'
@@ -28,7 +31,7 @@ import type { Transcriber } from '../transcription/transcriber.ts'
 import { suggestionsFromModelAnswer, formSchemaFor } from './form-answer.ts'
 import { inSequence } from './in-sequence.ts'
 import { profileDetailsFromModelAnswer, profileDetailsSchema } from './profile-details.ts'
-import { chatTask, condenseTask, formTask, knowledgeBlock, profileDetailsTask, replyTask, reviewTask, systemPrompt, translateTask } from './prompts.ts'
+import { chatTask, condenseTask, fieldPlacementTask, formTask, knowledgeBlock, profileDetailsTask, replyTask, reviewTask, systemPrompt, translateTask } from './prompts.ts'
 
 export type WorkflowDependencies = {
   profiles: ProfileStore
@@ -67,6 +70,35 @@ export const createWorkflows = (dependencies: WorkflowDependencies) => {
     profile: context.profileId === null ? undefined : dependencies.profiles.get(context.profileId),
     persona: context.personaId === null ? undefined : dependencies.personas.get(context.personaId),
   })
+
+  // A PDF drawn without fields gets them from the model reading its labels; one with no text layer gets none.
+  const placeFields = async (upload: { name: string; content: Uint8Array }, persona: Persona | undefined, signal: AbortSignal): Promise<PlacedField[]> => {
+    if ((await readFormFields(upload.content)).length > 0) return []
+    const lines = await readTextLines(upload.content)
+    if (lines.length === 0) return []
+    const listing = lines.map((line) => `${line.id} (${line.page}): ${line.text}`).join('\n')
+    const generation = await generate(dependencies.models, {
+      persona,
+      system: systemPrompt(persona, undefined, fieldPlacementTask),
+      messages: [{ role: 'user', content: `<form>\n${listing}\n</form>` }],
+      maxTokens: 8192,
+      signal,
+      jsonSchema: fieldPlacementSchemaFor(lines),
+    })
+    dependencies.runs.record({
+      workflow: 'form',
+      title: `Fields placed on ${upload.name}`,
+      model: generation.model,
+      input: listing,
+      output: generation.text,
+      outbound: generation.outbound,
+    })
+    return fieldPlacementsFromModelAnswer(generation.text, lines)
+  }
+
+  // The form is kept without the placed fields, so a correction to where they go applies on save.
+  const withPlacedFields = async (content: Uint8Array, placedFields: PlacedField[]): Promise<Uint8Array> =>
+    placedFields.length === 0 ? content : addPlacedFields(content, placedFields, await readTextLines(content))
 
   const storeDocx = async (title: string, text: string): Promise<string> =>
     dependencies.files.put({ name: `${title.replace(/[^\p{L}\p{N} _-]+/gu, '').trim() || 'offee'}.docx`, mimeType: docxMimeType, content: await textToDocx(title, text) })
@@ -188,14 +220,15 @@ export const createWorkflows = (dependencies: WorkflowDependencies) => {
 
     inspectForm: async (upload: { name: string; content: Uint8Array }, context: WorkflowContext, signal: AbortSignal): Promise<FormInspection> => {
       const { profile, persona } = resolve(context)
-      const fields = await readFormFields(upload.content)
+      const placedFields = await placeFields(upload, persona, signal)
+      const fields = await readFormFields(await withPlacedFields(upload.content, placedFields))
       const formFileId = dependencies.files.put({ name: upload.name, mimeType: 'application/pdf', content: upload.content })
       const today = new Date(dependencies.now()).toLocaleDateString('en-GB')
       const fromProfile = profile === undefined ? fields.map((field) => ({ name: field.name, value: '', source: 'none' as const })) : suggestFromProfile(fields, profile, dependencies.fieldAliases, today)
       const unanswered = fields.filter(
         (field) => field.kind !== 'signature' && fromProfile.find((suggestion) => suggestion.name === field.name)?.source === 'none',
       )
-      if (profile === undefined || unanswered.length === 0) return { formFileId, fileName: upload.name, fields, suggestions: fromProfile, model: null }
+      if (profile === undefined || unanswered.length === 0) return { formFileId, fileName: upload.name, fields, suggestions: fromProfile, model: null, placedFields }
 
       const citations = dependencies.documents.search(unanswered.map((field) => field.name).join(' '), context)
       const generation = await generate(dependencies.models, {
@@ -220,7 +253,7 @@ export const createWorkflows = (dependencies: WorkflowDependencies) => {
         output: generation.text,
         outbound: generation.outbound,
       })
-      return { formFileId, fileName: upload.name, fields, suggestions, model: generation.model }
+      return { formFileId, fileName: upload.name, fields, suggestions, model: generation.model, placedFields }
     },
 
     // Always the local model, whatever the persona allows: a document about a person stays here.
@@ -259,7 +292,7 @@ export const createWorkflows = (dependencies: WorkflowDependencies) => {
             return created
           })())
         : null
-      const filled = await fillForm(form.content, {
+      const filled = await fillForm(await withPlacedFields(form.content, request.placedFields), {
         values: request.values,
         sign: certificate === null ? null : { profile, certificate, now: new Date(dependencies.now()) },
       })

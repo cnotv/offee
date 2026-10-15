@@ -140,6 +140,16 @@ export type FormField = {
   options: string[]
 }
 
+export type PlacedFieldPosition = 'below' | 'above' | 'right' | 'left'
+
+// A field Offee added to a PDF that had none, on the text line that labels it.
+export type PlacedField = {
+  name: string
+  line: number
+  kind: 'text' | 'checkbox'
+  position: PlacedFieldPosition
+}
+
 export type FieldSuggestionSource = 'profile' | 'model' | 'none'
 
 export type FieldSuggestion = {
@@ -154,12 +164,15 @@ export type FormInspection = {
   fields: FormField[]
   suggestions: FieldSuggestion[]
   model: ModelUsed | null
+  // Empty when the PDF brought its own fields; otherwise the fields the model placed, to check.
+  placedFields: PlacedField[]
 }
 
 export type FormFillRequest = {
   formFileId: string
   profileId: string
   values: FieldSuggestion[]
+  placedFields: PlacedField[]
   sign: boolean
 }
 

@@ -6,6 +6,7 @@ import type {
   DocumentDetail,
   DocumentSummary,
   FieldSuggestion,
+  PlacedField,
   FormFillRequest,
   FormFillResult,
   FormInspection,
@@ -48,7 +49,7 @@ export type WorkflowPages = {
   reply: { thread: string; guidance: string; result: ShownResult | null }
   translate: { text: string; targetLanguage: string; glossary: string; result: ShownResult | null }
   review: { templateId: string; source: string; result: ShownResult | null }
-  forms: { inspection: FormInspection | null; values: FieldSuggestion[]; result: FormFillResult | null }
+  forms: { inspection: FormInspection | null; values: FieldSuggestion[]; placedFields: PlacedField[]; result: FormFillResult | null }
 }
 
 export type WorkflowPage = keyof WorkflowPages

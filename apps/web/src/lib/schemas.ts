@@ -73,6 +73,9 @@ export const formInspectionSchema = z.object({
   ),
   suggestions: z.array(fieldSuggestionSchema),
   model: modelUsedSchema.nullable(),
+  placedFields: z.array(
+    z.object({ name: z.string(), line: z.number(), kind: z.enum(['text', 'checkbox']), position: z.enum(['below', 'above', 'right', 'left']) }),
+  ),
 })
 
 export const profileReadingSchema = z.object({
