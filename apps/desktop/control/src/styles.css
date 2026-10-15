@@ -35,3 +35,8 @@ body {
 .control-message {
   white-space: pre-line;
 }
+
+/* The switch while an update installs. */
+[inert] {
+  opacity: 0.5;
+}

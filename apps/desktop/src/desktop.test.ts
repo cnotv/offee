@@ -1,7 +1,11 @@
+import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { approvalPromptFor, parsePendingReply, parseStatusReply, requestsToAsk, switchLabel } from './gateway-replies.ts'
 import { describeFailure } from './setup-messages.ts'
 import { trayEntries } from './tray-menu.ts'
+import { removeBundle } from './update-install.ts'
 import { assetNameFor, digestMatches, installKindFor, parseRelease, releaseTagFor, startCommandFor, updateFor } from './updates.ts'
 import { layoutViews, toolbarHeight } from './window-layout.ts'
 import { isAllowedRequestUrl, isOffeeUrl, isPermissionAllowed, pathWithHomebrew, progressAsLines } from './window-policy.ts'
@@ -197,6 +201,17 @@ describe('updating the app', () => {
     expect(startCommandFor(newer, current, true)).toBe('update')
     expect(startCommandFor(current, current, true)).toBe('start')
     expect(startCommandFor(newer, current, false)).toBe('start')
+  })
+})
+
+describe('replacing the app bundle', () => {
+  it('removes a bundle whose Resources hold an asar archive', async () => {
+    const bundle = join(mkdtempSync(join(tmpdir(), 'offee-bundle-')), '.Offee-previous.app')
+    mkdirSync(join(bundle, 'Contents', 'Resources'), { recursive: true })
+    writeFileSync(join(bundle, 'Contents', 'Resources', 'app.asar'), 'archive')
+    await removeBundle(bundle)
+    expect(existsSync(bundle)).toBe(false)
+    await removeBundle(bundle)
   })
 })
 
