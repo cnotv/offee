@@ -335,6 +335,20 @@ pnpm lint --max-warnings 0 && pnpm typecheck && pnpm test
 pnpm --filter @offee/desktop start   # the Mac app, against the launcher in this checkout
 ```
 
+To try a change end to end before it ships, run Offee from the checkout against a real local
+model. Both listen on loopback only; nothing here is sealed off, so it is for development alone.
+
+```sh
+brew install llama.cpp
+bin/offee-dev model   # the VM's model and context size on 127.0.0.1:18080, downloaded the first time
+bin/offee-dev app     # Offee from this checkout on 127.0.0.1:18470, data in .data-dev
+pnpm e2e              # Playwright fills a form on the Forms page and checks the saved PDF
+OFFEE_E2E_FORM=~/Downloads/form.pdf pnpm e2e   # the same with any PDF
+```
+
+`pnpm e2e` starts whichever of the two is not running. The report, with a screenshot of the
+review and the filled PDF, is in `playwright-report/`.
+
 Netlify publishes the UI alone for every pull request, in **demo mode** (`VITE_DEMO_MODE=1`, set in
 `netlify.toml`): sample profiles, documents and runs, and canned answers held in the browser tab,
 since no Offee server runs there. `VITE_DEMO_MODE=1 pnpm --filter @offee/web dev` runs the same
