@@ -20,7 +20,7 @@ import {
   profileInputSchema,
   replyRequestSchema,
   reviewRequestSchema,
-  storedItemKindSchema,
+  storedItemDeletionSchema,
   translateRequestSchema,
 } from '../store/schemas.ts'
 import type { Transcriber } from '../transcription/transcriber.ts'
@@ -234,10 +234,9 @@ export const createApp = (dependencies: AppDependencies): Hono => {
   })
 
   app.get('/api/stored-data', (context) => context.json(dependencies.storedData.list()))
-  app.delete('/api/stored-data/:kind/:id', (context) => {
-    const kind = storedItemKindSchema.safeParse(context.req.param('kind'))
-    if (!kind.success) return context.json({ error: 'Unknown kind of stored data' }, 400)
-    return dependencies.storedData.remove(kind.data, context.req.param('id')) ? context.body(null, 204) : context.notFound()
+  app.post('/api/stored-data/delete', jsonLimit, async (context) => {
+    const input = await readJson(context, storedItemDeletionSchema)
+    return input.ok ? context.json({ removed: dependencies.storedData.removeMany(input.data.items) }) : context.json({ error: input.error }, 400)
   })
   app.delete('/api/stored-data', (context) => {
     dependencies.storedData.removeAll()

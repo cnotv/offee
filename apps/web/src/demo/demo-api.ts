@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import type { DocumentAssignment, DocumentSummary, FormField, Persona, Profile, RunDetail, RunSummary, StoredItem, WorkflowContext, WorkflowKind } from '@offee/contracts'
+import type { DocumentAssignment, DocumentSummary, FormField, Persona, Profile, RunDetail, RunSummary, StoredItem, StoredItemKind, WorkflowContext, WorkflowKind } from '@offee/contracts'
 import reviewTemplatesFile from '../../../../config/review-templates.json'
 import { reviewTemplateSchema } from '@/lib/schemas'
 import type { DemoDocument, OffeeApi } from '@/lib/types'
@@ -270,12 +270,14 @@ export const createDemoApi = (): OffeeApi => {
         ...[...memory.files].map(([id, file]): StoredItem => ({ kind: 'file', id, title: file.name, bytes: file.bytes, createdAt: file.createdAt })),
         ...memory.runs.map((run): StoredItem => ({ kind: 'run', id: run.id, title: run.title, bytes: run.input.length + run.output.length, createdAt: run.createdAt })),
       ].toSorted((first, second) => second.createdAt - first.createdAt),
-    deleteStoredItem: async (kind, id) => {
-      if (kind === 'profile') memory.profiles = memory.profiles.filter((profile) => profile.id !== id)
-      if (kind === 'persona') memory.personas = memory.personas.filter((persona) => persona.id !== id)
-      if (kind === 'document') memory.documents = memory.documents.filter((document) => document.id !== id)
-      if (kind === 'file') memory.files.delete(id)
-      if (kind === 'run') memory.runs = memory.runs.filter((run) => run.id !== id)
+    deleteStoredItems: async (items) => {
+      const chosen = new Set(items.map(({ kind, id }) => `${kind}:${id}`))
+      const kept = (kind: StoredItemKind) => (item: { id: string }) => !chosen.has(`${kind}:${item.id}`)
+      memory.profiles = memory.profiles.filter(kept('profile'))
+      memory.personas = memory.personas.filter(kept('persona'))
+      memory.documents = memory.documents.filter(kept('document'))
+      memory.runs = memory.runs.filter(kept('run'))
+      items.filter((item) => item.kind === 'file').forEach((item) => memory.files.delete(item.id))
     },
     deleteAllStoredData: async () => {
       memory.profiles = []

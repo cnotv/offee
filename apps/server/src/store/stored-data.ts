@@ -1,6 +1,6 @@
 import type { DatabaseSync } from 'node:sqlite'
 import { z } from 'zod'
-import type { StoredItem, StoredItemKind } from '@offee/contracts'
+import type { StoredItem, StoredItemKey, StoredItemKind } from '@offee/contracts'
 import { storedItemKindSchema } from './schemas.ts'
 
 // Each kind's table, the column that names an item, and what counts towards its size.
@@ -34,9 +34,24 @@ export const createStoredData = (database: DatabaseSync) => ({
         const parsed = itemRowSchema.parse(row)
         return { kind: parsed.kind, id: parsed.id, title: parsed.title, bytes: parsed.bytes, createdAt: parsed.created_at }
       }),
-  remove: (kind: StoredItemKind, id: string): boolean => {
-    if (kind === 'document') database.prepare('DELETE FROM chunks WHERE document_id = ?').run(id)
-    return database.prepare(`DELETE FROM ${sources[kind].table} WHERE id = ?`).run(id).changes > 0
+  /**
+   * Deletes the items in one transaction, a document's passages with it.
+   * @param items The items to delete.
+   * @returns How many existed and are now gone.
+   */
+  removeMany: (items: StoredItemKey[]): number => {
+    database.exec('BEGIN')
+    try {
+      const removed = items.reduce((count, { kind, id }) => {
+        if (kind === 'document') database.prepare('DELETE FROM chunks WHERE document_id = ?').run(id)
+        return count + Number(database.prepare(`DELETE FROM ${sources[kind].table} WHERE id = ?`).run(id).changes)
+      }, 0)
+      database.exec('COMMIT')
+      return removed
+    } catch (error) {
+      database.exec('ROLLBACK')
+      throw error
+    }
   },
   removeAll: (): void => {
     database.exec(['chunks', ...Object.values(sources).map((source) => source.table)].map((table) => `DELETE FROM ${table};`).join(' '))

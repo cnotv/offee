@@ -285,21 +285,22 @@ describe('stored data', () => {
     expect(items.every((item) => item.bytes > 0)).toBe(true)
   })
 
-  it('deletes one item, and its document passages with it', async () => {
+  it('deletes the chosen items, and the passages of a document with them', async () => {
     const { request, postJson, items } = await fillEverything()
-    const document = items.find((item) => item.kind === 'document')
-    expect((await request(`/api/stored-data/document/${document?.id}`, { method: 'DELETE' })).status).toBe(204)
-    expect((await request(`/api/stored-data/document/${document?.id}`, { method: 'DELETE' })).status).toBe(404)
+    const chosen = items.filter((item) => item.kind === 'document' || item.kind === 'run').map(({ kind, id }) => ({ kind, id }))
+    const removedSchema = z.object({ removed: z.number() })
+    expect(await parse(await postJson('/api/stored-data/delete', { items: chosen }), removedSchema)).toEqual({ removed: 2 })
+    expect(await parse(await postJson('/api/stored-data/delete', { items: chosen }), removedSchema)).toEqual({ removed: 0 })
 
     const left = await parse(await request('/api/stored-data'), storedItemsSchema)
-    expect(left.map((item) => item.kind)).not.toContain('document')
+    expect(left.map((item) => item.kind).toSorted()).toEqual(['file', 'persona', 'profile'])
     const answer = await parse(await postJson('/api/chat', { profileId: null, personaId: null, conversationId: secondConversation, history: [], message: 'When does the office close?' }), answerSchema)
     expect(answer.citations).toEqual([])
   })
 
   it('refuses a kind it does not keep', async () => {
-    const { request } = await fillEverything()
-    expect((await request('/api/stored-data/secrets/1', { method: 'DELETE' })).status).toBe(400)
+    const { postJson } = await fillEverything()
+    expect((await postJson('/api/stored-data/delete', { items: [{ kind: 'secrets', id: '1' }] })).status).toBe(400)
   })
 
   it('deletes everything at once', async () => {

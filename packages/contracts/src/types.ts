@@ -235,3 +235,6 @@ export type StoredItem = {
   bytes: number
   createdAt: number
 }
+
+/** Which stored items to delete at once. */
+export type StoredItemKey = Pick<StoredItem, 'kind' | 'id'>
