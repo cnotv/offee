@@ -8,6 +8,15 @@ const stateSchema = z.object({
   gateway: z.object({ mode: z.enum(['sealed', 'ask', 'open']), openUntil: z.number().nullable(), pendingCount: z.number() }).nullable(),
   hasAnthropicKey: z.boolean(),
   message: z.string().nullable(),
+  buildCommit: z.string(),
+  update: z.discriminatedUnion('status', [
+    z.object({ status: z.literal('idle') }),
+    z.object({ status: z.literal('checking') }),
+    z.object({ status: z.literal('current') }),
+    z.object({ status: z.literal('available'), commit: z.string() }),
+    z.object({ status: z.literal('installing') }),
+    z.object({ status: z.literal('notice'), message: z.string() }),
+  ]),
 })
 
 const readState = (value: unknown): ControlState => stateSchema.parse(value)
@@ -31,6 +40,8 @@ const api: ControlApi = {
   saveAnthropicKey: (key: string) => invoke('offee:save-key', key),
   runSelftest: () => invoke('offee:selftest'),
   openOffee: () => invoke('offee:open-offee'),
+  checkForUpdate: () => invoke('offee:check-update'),
+  installUpdate: () => invoke('offee:install-update'),
 }
 
 contextBridge.exposeInMainWorld('offeeControl', api)

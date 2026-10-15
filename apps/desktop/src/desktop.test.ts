@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { approvalPromptFor, parsePendingReply, parseStatusReply, requestsToAsk, switchLabel } from './gateway-replies.ts'
 import { describeFailure } from './setup-messages.ts'
 import { trayEntries } from './tray-menu.ts'
+import { assetNameFor, digestMatches, installKindFor, parseRelease, releaseTagFor, startCommandFor, updateFor } from './updates.ts'
 import { isAllowedRequestUrl, isOffeeUrl, isPermissionAllowed, pathWithHomebrew, progressAsLines } from './window-policy.ts'
 
 const request = (id: string, createdAt: number) => ({
@@ -65,6 +66,11 @@ describe('the menu bar', () => {
     expect(labels(trayEntries('needs-setup', null, 0))).not.toContain('Stop Offee')
   })
 
+  it('checks for updates in any state', () => {
+    expect(labels(trayEntries('needs-setup', null, 0))).toContain('Check for updates…')
+    expect(labels(trayEntries('running', { mode: 'sealed', openUntil: null, pendingCount: 0 }, 0))).toContain('Check for updates…')
+  })
+
   it('opens Offee only when it runs', () => {
     const openEntry = trayEntries('stopped', null, 0).find((entry) => entry.type === 'action' && entry.label === 'Open Offee')
     expect(openEntry).toMatchObject({ enabled: false })
@@ -116,5 +122,79 @@ describe('the window policy', () => {
 
   it('turns redrawn progress into lines', () => {
     expect(progressAsLines('10%\r20%\rdone\r\n')).toBe('10%\n20%\ndone\r\n')
+  })
+})
+
+describe('updating the app', () => {
+  const digest = `sha256:${'a'.repeat(64)}`
+  const asset = (name: string, overrides: Record<string, unknown> = {}) => ({
+    name,
+    url: 'https://api.github.com/repos/cnotv/offee/releases/assets/644377132',
+    digest,
+    ...overrides,
+  })
+  const release = (commit: string, assets: unknown[] = [asset('Offee-arm64.dmg')]) => parseRelease({ target_commitish: commit, assets, extra: 'ignored' })
+  const newer = 'b'.repeat(40)
+  const current = 'c'.repeat(40)
+
+  it('reads only the release it expects from GitHub', () => {
+    expect(release(newer)).not.toBeNull()
+    expect(parseRelease({ target_commitish: newer })).toBeNull()
+    expect(parseRelease({ target_commitish: 42, assets: [] })).toBeNull()
+    expect(parseRelease('<html>rate limited</html>')).toBeNull()
+  })
+
+  it('offers an update only when the release was built from another commit', () => {
+    const latest = release(newer)
+    if (latest === null) throw new Error('release did not parse')
+    expect(updateFor(newer, latest, 'Offee-arm64.dmg')).toBeNull()
+    expect(updateFor(current, latest, 'Offee-arm64.dmg')).toEqual({
+      commit: newer,
+      asset: { name: 'Offee-arm64.dmg', url: 'https://api.github.com/repos/cnotv/offee/releases/assets/644377132', digest },
+    })
+  })
+
+  it('downloads nothing without a digest, from another host, or that is missing', () => {
+    const elsewhere = release(newer, [asset('Offee-arm64.dmg', { url: 'https://attacker.example/Offee-arm64.dmg' })])
+    const undigested = release(newer, [asset('Offee-arm64.dmg', { digest: null })])
+    const latest = release(newer)
+    if (elsewhere === null || undigested === null || latest === null) throw new Error('release did not parse')
+    expect(updateFor(current, elsewhere, 'Offee-arm64.dmg')?.asset).toBeNull()
+    expect(updateFor(current, undigested, 'Offee-arm64.dmg')?.asset).toBeNull()
+    expect(updateFor(current, latest, 'Offee-linux-x64.deb')?.asset).toBeNull()
+  })
+
+  it('accepts a download only when its SHA-256 matches', () => {
+    expect(digestMatches(digest, 'a'.repeat(64))).toBe(true)
+    expect(digestMatches(digest, 'b'.repeat(64))).toBe(false)
+  })
+
+  it('reads the release and the file made for this computer', () => {
+    expect(releaseTagFor('darwin')).toBe('mac-preview')
+    expect(releaseTagFor('linux')).toBe('linux-preview')
+    expect(releaseTagFor('win32')).toBeNull()
+    expect(assetNameFor('darwin', 'arm64', 'replace-app')).toBe('Offee-arm64.dmg')
+    expect(assetNameFor('linux', 'x64', 'deb')).toBe('Offee-linux-x64.deb')
+    expect(assetNameFor('linux', 'arm64', 'deb')).toBe('Offee-linux-arm64.deb')
+    expect(assetNameFor('linux', 'arm64', 'release-page')).toBe('Offee-linux-arm64.tar.gz')
+  })
+
+  it('installs the way the app was installed', () => {
+    const mac = { packaged: true, platform: 'darwin', applicationsWritable: true }
+    expect(installKindFor({ ...mac, execPath: '/Applications/Offee.app/Contents/MacOS/Offee' })).toBe('replace-app')
+    expect(installKindFor({ ...mac, applicationsWritable: false, execPath: '/Applications/Offee.app/Contents/MacOS/Offee' })).toBe('open-disk-image')
+    expect(installKindFor({ ...mac, execPath: '/private/var/folders/x/AppTranslocation/y/d/Offee.app/Contents/MacOS/Offee' })).toBe('open-disk-image')
+    const linux = { packaged: true, platform: 'linux', applicationsWritable: false }
+    expect(installKindFor({ ...linux, execPath: '/opt/Offee/offee' })).toBe('deb')
+    expect(installKindFor({ ...linux, execPath: '/home/someone/Offee-linux-x64/offee' })).toBe('release-page')
+    expect(installKindFor({ ...linux, packaged: false, execPath: '/usr/bin/electron' })).toBe('source')
+    expect(installKindFor({ ...linux, platform: 'win32', execPath: 'C:\\Offee\\Offee.exe' })).toBe('source')
+  })
+
+  it('rebuilds the containers once after the app changed, not on every start', () => {
+    expect(startCommandFor(null, current, true)).toBe('update')
+    expect(startCommandFor(newer, current, true)).toBe('update')
+    expect(startCommandFor(current, current, true)).toBe('start')
+    expect(startCommandFor(newer, current, false)).toBe('start')
   })
 })
