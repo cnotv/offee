@@ -1,14 +1,19 @@
-import { PlusIcon, TrashIcon } from '@radix-ui/react-icons'
+import { FileIcon, PlusIcon, TrashIcon } from '@radix-ui/react-icons'
 import { AlertDialog, Badge, Box, Button, Callout, Card, Dialog, Flex, Grid, Heading, Text, TextArea, TextField } from '@radix-ui/themes'
 import { useState } from 'react'
 import type { Profile, ProfileInput, ProfileReading } from '@offee/contracts'
 import { ErrorCallout } from '@/components/ErrorCallout'
 import { FilePickerButton } from '@/components/FilePickerButton'
+import { RunningOperations } from '@/components/Operations'
+import { SamplePreviewButton } from '@/components/SamplePreviewButton'
 import { ModelBadge } from '@/components/WorkflowResultCard'
 import { useAction } from '@/hooks/useAction'
 import { useDirectory } from '@/hooks/useDirectory'
+import { useOperations } from '@/hooks/useOperations'
 import { api } from '@/lib/api'
+import { describeEstimate, estimateOf } from '@/lib/estimates'
 import { mergeProfileDetails } from '@/lib/merge-profile-details'
+import { loadSample, sampleFiles } from '@/lib/samples'
 
 const emptyProfile: ProfileInput = {
   label: '',
@@ -83,6 +88,16 @@ const ProfileDialog = ({ profile, open, onOpenChange, onSaved }: ProfileDialogPr
   const [reading, setReading] = useState<ProfileReading | null>(null)
   const action = useAction()
   const documentReading = useAction()
+  const { start, history } = useOperations()
+  // The details land in this dialog's draft, so the reading belongs to it, though it shows and stops like any operation.
+  const readDocument = (fileName: string, choose: (signal: AbortSignal) => Promise<File>) =>
+    documentReading.run(() =>
+      start('profile', `Reading ${fileName} into a profile`, async (signal) => {
+        const read = await api.readProfileDocument(await choose(signal), signal)
+        setDraft((current) => mergeProfileDetails(current, read.details))
+        setReading(read)
+      }),
+    )
   const set = <Key extends keyof ProfileInput>(key: Key, value: ProfileInput[Key]) => setDraft((current) => ({ ...current, [key]: value }))
 
   return (
@@ -97,20 +112,24 @@ const ProfileDialog = ({ profile, open, onOpenChange, onSaved }: ProfileDialogPr
             <FilePickerButton
               accept=".pdf,.docx,.txt,.png,.jpg,.jpeg,.tif,.tiff"
               disabled={documentReading.busy}
-              onPick={(file) =>
-                documentReading.run(async () => {
-                  const read = await api.readProfileDocument(file)
-                  setDraft((current) => mergeProfileDetails(current, read.details))
-                  setReading(read)
-                })
-              }
+              onPick={(file) => readDocument(file.name, async () => file)}
             >
               Read from a document
             </FilePickerButton>
-            <Text size="1" color="gray">
-              {documentReading.busy ? 'Reading the document on this machine…' : 'An ID, a CV or a scan: the local model fills in what it says.'}
-            </Text>
+            <Button
+              variant="ghost"
+              disabled={documentReading.busy}
+              onClick={() => readDocument(sampleFiles.scan.name, (signal) => loadSample(sampleFiles.scan, signal))}
+            >
+              <FileIcon /> Try the sample scan
+            </Button>
+            <SamplePreviewButton sample={sampleFiles.scan} />
           </Flex>
+          <Text size="1" color="gray">
+            An ID, a CV or a scan: the local model on this machine fills in what it says. That takes{' '}
+            {describeEstimate(estimateOf(history, 'profile'))}; keep this window open until it is done.
+          </Text>
+          <RunningOperations kinds={['profile']} />
           <ErrorCallout error={documentReading.error} />
           {reading !== null && (
             <Callout.Root color="grass" variant="surface">

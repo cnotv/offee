@@ -25,9 +25,9 @@ export const ChatView = () => {
       { role: 'assistant', content: exchange.answer.text },
     ])
     page.set({ message: '', pendingQuestion: question })
-    page.run(async () => {
+    page.run({ kind: 'chat', label: `Answering: ${question.slice(0, 40)}` }, async (signal) => {
       try {
-        const answer = await api.chat({ profileId, personaId, conversationId, history, message: question })
+        const answer = await api.chat({ profileId, personaId, conversationId, history, message: question }, signal)
         page.change((current) => ({ exchanges: [...current.exchanges, { question, answer }], pendingQuestion: null }))
       } catch (error) {
         // The question goes back into the box, so nothing typed is lost.

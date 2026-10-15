@@ -25,7 +25,7 @@ export const TranslateView = () => {
           <FilePickerButton
             accept=".pdf,.docx,.txt,.md,.eml"
             disabled={page.busy}
-            onPick={(file) => page.run(async () => page.set({ text: (await api.extractText(file)).text }))}
+            onPick={(file) => page.run({ kind: 'extract', label: `Reading ${file.name}` }, async (signal) => page.set({ text: (await api.extractText(file, signal)).text }))}
           >
             Load a document
           </FilePickerButton>
@@ -50,7 +50,7 @@ export const TranslateView = () => {
         <Button
           loading={page.busy}
           disabled={text.trim() === '' || targetLanguage.trim() === ''}
-          onClick={() => page.run(async () => page.set({ result: await api.translate({ profileId, personaId, text, targetLanguage, glossary }) }))}
+          onClick={() => page.run({ kind: 'translate', label: `Translating into ${targetLanguage}` }, async (signal) => page.set({ result: await api.translate({ profileId, personaId, text, targetLanguage, glossary }, signal) }))}
         >
           <GlobeIcon /> Translate
         </Button>

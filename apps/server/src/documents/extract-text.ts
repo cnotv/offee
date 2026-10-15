@@ -59,6 +59,7 @@ const scannedImageTypes = new Set(['image/png', 'image/jpeg', 'image/tiff'])
  * @param fileName The file's name.
  * @param declaredType The type the browser declared.
  * @param content The file's bytes.
+ * @param signal Stops reading a scan when the person stops the operation.
  * @param readScan Reads a scan's text; Tesseract unless a test replaces it.
  * @returns The text and the type it was read as; throws for a kind it cannot read.
  */
@@ -66,6 +67,7 @@ export const extractText = async (
   fileName: string,
   declaredType: string,
   content: Uint8Array,
+  signal: AbortSignal,
   readScan: ReadScan = readScanWithTesseract,
 ): Promise<ExtractedText> => {
   const mimeType = resolveMimeType(fileName, declaredType)
@@ -74,9 +76,9 @@ export const extractText = async (
     const { text } = await extractPdfText(pdf, { mergePages: true })
     // A scan is pictures of pages with no text layer.
     if (text.trim() !== '') return { text: text.trim(), mimeType }
-    return { text: (await readScan('pdf', content)).trim(), mimeType }
+    return { text: (await readScan('pdf', content, signal)).trim(), mimeType }
   }
-  if (scannedImageTypes.has(mimeType)) return { text: (await readScan('image', content)).trim(), mimeType }
+  if (scannedImageTypes.has(mimeType)) return { text: (await readScan('image', content, signal)).trim(), mimeType }
   if (mimeType === docxMimeType) {
     const { value } = await mammoth.extractRawText({ buffer: Buffer.from(content) })
     return { text: value.trim(), mimeType }

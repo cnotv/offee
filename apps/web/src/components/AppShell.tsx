@@ -15,6 +15,7 @@ import { Badge, Box, Flex, Heading, Spinner, Text, Tooltip } from '@radix-ui/the
 import { useEffect } from 'react'
 import { NavLink, Outlet, useMatches } from 'react-router'
 import type { AppStatus } from '@offee/contracts'
+import { OperationsIndicator } from '@/components/Operations'
 import { useLoad } from '@/hooks/useLoad'
 import { useWorkflowActivity } from '@/hooks/useWorkflowPages'
 import { api, isDemoMode } from '@/lib/api'
@@ -26,7 +27,7 @@ const navigationItems: { title: string; path: string; Icon: typeof ChatBubbleIco
   { title: 'Reply', path: '/reply', Icon: Pencil2Icon, page: 'reply' },
   { title: 'Translate', path: '/translate', Icon: GlobeIcon, page: 'translate' },
   { title: 'Review', path: '/review', Icon: ReaderIcon, page: 'review' },
-  { title: 'Forms', path: '/forms', Icon: FileTextIcon },
+  { title: 'Forms', path: '/forms', Icon: FileTextIcon, page: 'forms' },
   { title: 'Library', path: '/library', Icon: StackIcon },
   { title: 'Profiles', path: '/profiles', Icon: IdCardIcon },
   { title: 'Personas', path: '/personas', Icon: PersonIcon },
@@ -109,6 +110,7 @@ export const AppShell = () => {
           <Heading size="5" weight="medium">
             {pageTitle}
           </Heading>
+          <OperationsIndicator />
         </header>
         <main className="app-main">
           <Outlet />

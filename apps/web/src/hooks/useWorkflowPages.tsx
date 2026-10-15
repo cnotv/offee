@@ -1,14 +1,20 @@
 import { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useOperations } from '@/hooks/useOperations'
 import { emptyWorkflowPages } from '@/lib/continue-run'
-import type { Continuation, PageActivity, WorkflowPage, WorkflowPages } from '@/lib/types'
+import type { Continuation, OperationKind, PageActivity, WorkflowPage, WorkflowPages } from '@/lib/types'
 
 type PageChange<Page extends WorkflowPage> = (current: WorkflowPages[Page]) => Partial<WorkflowPages[Page]>
+
+/** What a page runs: its kind, for the estimate, and the label the operations list shows. */
+type PageOperation = { kind: OperationKind; label: string }
+
+type PageWork = (signal: AbortSignal) => Promise<void>
 
 type WorkflowPagesValue = {
   pages: WorkflowPages
   activity: Record<WorkflowPage, PageActivity>
   change: <Page extends WorkflowPage>(page: Page, pageChange: PageChange<Page>) => void
-  run: (page: WorkflowPage, work: () => Promise<void>) => void
+  run: (page: WorkflowPage, operation: PageOperation, work: PageWork) => void
   open: (continuation: Continuation) => void
   empty: () => WorkflowPages
 }
@@ -19,7 +25,7 @@ const newConversationId = (): string => crypto.randomUUID()
 
 const idle: PageActivity = { busy: false, error: null }
 
-const noActivity: Record<WorkflowPage, PageActivity> = { chat: idle, reply: idle, translate: idle, review: idle }
+const noActivity: Record<WorkflowPage, PageActivity> = { chat: idle, reply: idle, translate: idle, review: idle, forms: idle }
 
 const withPage = <Page extends WorkflowPage>(pages: WorkflowPages, page: Page, state: WorkflowPages[Page]): WorkflowPages => ({ ...pages, [page]: state })
 
@@ -32,22 +38,23 @@ export const WorkflowPagesProvider = ({ children }: { children: ReactNode }) => 
   const [activity, setActivity] = useState(noActivity)
   // Read inside run() so a second click while a page works is ignored, without re-creating run.
   const busyPages = useRef(new Set<WorkflowPage>())
+  const { start } = useOperations()
 
   const change = useCallback(<Page extends WorkflowPage>(page: Page, pageChange: PageChange<Page>) => {
     setPages((current) => withPage(current, page, { ...current[page], ...pageChange(current[page]) }))
   }, [])
 
-  const run = useCallback((page: WorkflowPage, work: () => Promise<void>) => {
+  const run = useCallback((page: WorkflowPage, operation: PageOperation, work: PageWork) => {
     if (busyPages.current.has(page)) return
     busyPages.current.add(page)
     setActivity((current) => ({ ...current, [page]: { busy: true, error: null } }))
-    work()
+    start(operation.kind, operation.label, work)
       .then(() => setActivity((current) => ({ ...current, [page]: idle })))
       .catch((caught: unknown) =>
         setActivity((current) => ({ ...current, [page]: { busy: false, error: caught instanceof Error ? caught.message : 'Something went wrong' } })),
       )
       .finally(() => busyPages.current.delete(page))
-  }, [])
+  }, [start])
 
   const open = useCallback((continuation: Continuation) => {
     setPages((current) => withPage(current, continuation.page, continuation.state))
@@ -79,7 +86,7 @@ export const useWorkflowPage = <Page extends WorkflowPage>(page: Page) => {
     error: activity[page].error,
     set: (values: Partial<WorkflowPages[Page]>) => change(page, () => values),
     change: (pageChange: PageChange<Page>) => change(page, pageChange),
-    run: (work: () => Promise<void>) => run(page, work),
+    run: (operation: PageOperation, work: PageWork) => run(page, operation, work),
   }
 }
 

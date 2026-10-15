@@ -229,6 +229,35 @@ describe('form suggestions', () => {
   })
 })
 
+describe('previewing a document', () => {
+  it('returns the text kept for it, and 404 for an unknown one', async () => {
+    const { request } = setUp({ ok: false, reason: 'unused', reachedProvider: false })
+    const upload = new FormData()
+    upload.set('file', new File(['Parking is behind the building.'], 'parking.txt', { type: 'text/plain' }))
+    const added = await parse(await request('/api/documents', { method: 'POST', body: upload }), idSchema)
+
+    const preview = await parse(await request(`/api/documents/${added.id}`), z.object({ title: z.string(), text: z.string() }))
+    expect(preview).toEqual(expect.objectContaining({ title: 'parking.txt', text: 'Parking is behind the building.' }))
+    expect((await request('/api/documents/unknown')).status).toBe(404)
+  })
+})
+
+describe('stopping an operation', () => {
+  it('hands the request’s abort signal to the local model, so closing the request stops the model call', async () => {
+    const { request, localRequests } = setUp({ ok: false, reason: 'unused', reachedProvider: false })
+    const controller = new AbortController()
+    await request('/api/chat', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ profileId: null, personaId: null, conversationId: firstConversation, history: [], message: 'Hello' }),
+      signal: controller.signal,
+    })
+    expect(localRequests[0]?.signal.aborted).toBe(false)
+    controller.abort()
+    expect(localRequests[0]?.signal.aborted).toBe(true)
+  })
+})
+
 describe('validation', () => {
   it('rejects a malformed profile', async () => {
     const { postJson } = setUp({ ok: false, reason: '', reachedProvider: false })

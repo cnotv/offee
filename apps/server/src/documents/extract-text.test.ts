@@ -22,21 +22,21 @@ const recordingScanReader = () => {
 describe('reading text out of uploads', () => {
   it('reads a PDF with a text layer without OCR', async () => {
     const { calls, readScan } = recordingScanReader()
-    const extracted = await extractText('letter.pdf', 'application/pdf', await pdfWith('Dear Ms Weber'), readScan)
+    const extracted = await extractText('letter.pdf', 'application/pdf', await pdfWith('Dear Ms Weber'), new AbortController().signal, readScan)
     expect(extracted.text).toBe('Dear Ms Weber')
     expect(calls).toEqual([])
   })
 
   it('reads a scanned PDF, which has no text layer, with OCR', async () => {
     const { calls, readScan } = recordingScanReader()
-    const extracted = await extractText('scan.pdf', 'application/pdf', await pdfWith(null), readScan)
+    const extracted = await extractText('scan.pdf', 'application/pdf', await pdfWith(null), new AbortController().signal, readScan)
     expect(extracted).toEqual({ text: 'Text read from the scan', mimeType: 'application/pdf' })
     expect(calls).toEqual(['pdf'])
   })
 
   it('reads a photo of a document with OCR', async () => {
     const { calls, readScan } = recordingScanReader()
-    const extracted = await extractText('id-card.JPG', '', new Uint8Array([1, 2, 3]), readScan)
+    const extracted = await extractText('id-card.JPG', '', new Uint8Array([1, 2, 3]), new AbortController().signal, readScan)
     expect(extracted).toEqual({ text: 'Text read from the scan', mimeType: 'image/jpeg' })
     expect(calls).toEqual(['image'])
   })
