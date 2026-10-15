@@ -38,9 +38,10 @@ bold() { printf '%s%s%s\n' "$bold_on" "$*" "$style_off"; }
 info() { printf '  %s\n' "$*"; }
 fail() { explained=1; printf '%soffee: %s%s\n' "$red_on" "$*" "$style_off" >&2; exit 1; }
 
-# OFFEE_RUNTIME=docker uses the Docker engine already running instead of a Colima VM. That is
-# container isolation only, meant for Linux hosts that already isolate Docker, and for tests.
-runtime="${OFFEE_RUNTIME:-colima}"
+# The docker runtime uses the Docker engine already running instead of a Colima VM. That is
+# container isolation only, meant for Linux hosts that already isolate Docker or cannot run a VM
+# (a server without /dev/kvm), and for tests. `setup --runtime` saves it; OFFEE_RUNTIME overrides.
+runtime=""
 
 load_settings() {
   mkdir -p "$state_dir" "$keys_dir"
@@ -49,6 +50,7 @@ load_settings() {
   OFFEE_CHAT_MODEL="$(read_setting OFFEE_CHAT_MODEL "$default_chat_model")"
   OFFEE_GPU="$(read_setting OFFEE_GPU 0)"
   OFFEE_PORT="$(read_setting OFFEE_PORT 8470)"
+  runtime="${OFFEE_RUNTIME:-$(read_setting OFFEE_RUNTIME colima)}"
   export OFFEE_CHAT_MODEL OFFEE_PORT
   export OFFEE_LLAMA_IMAGE="$llama_image" OFFEE_LLAMA_VULKAN_IMAGE="$llama_vulkan_image"
 }
@@ -131,9 +133,11 @@ install_tools() {
   esac
 }
 
+cpu_count() { sysctl -n hw.ncpu 2>/dev/null || nproc; }
+
 default_cpus() {
   local cores
-  cores="$( (sysctl -n hw.ncpu 2>/dev/null || nproc) )"
+  cores="$(cpu_count)"
   echo $(( cores > 8 ? cores / 2 : (cores > 4 ? 4 : cores) ))
 }
 
@@ -317,7 +321,7 @@ check_platform() {
     Darwin/*) check_fail "Offee needs a Mac with Apple silicon" ;;
     Linux/*)
       if [ "$runtime" = "docker" ] || [ -e /dev/kvm ]; then check_ok "Linux on $(uname -m)"
-      else check_fail "/dev/kvm is missing: enable virtualization so the VM can run"; fi ;;
+      else check_fail "/dev/kvm is missing: enable virtualization so the VM can run, or set up with --runtime docker for container isolation only"; fi ;;
     *) check_fail "Offee runs on macOS and Linux" ;;
   esac
 }
@@ -326,7 +330,9 @@ check_tools() {
   local missing=()
   require_command docker || missing+=(docker)
   if [ "$runtime" = "colima" ]; then require_command colima || missing+=(colima); fi
-  if [ ${#missing[@]} -eq 0 ]; then check_ok "Colima and Docker are installed"
+  if [ ${#missing[@]} -eq 0 ] && [ "$runtime" = "docker" ] && ! docker info >/dev/null 2>&1; then
+    check_fail "the Docker engine does not answer: start it, or add this user to the docker group"
+  elif [ ${#missing[@]} -eq 0 ]; then check_ok "Colima and Docker are installed"
   elif [ "$(uname -s)" = "Darwin" ] && require_command brew; then check_ok "Homebrew will install ${missing[*]}"
   elif [ "$(uname -s)" = "Darwin" ]; then check_fail "Homebrew is needed to install ${missing[*]}: https://brew.sh"
   else check_fail "Install ${missing[*]} with your package manager (Colima: https://colima.run)"; fi
@@ -349,6 +355,19 @@ check_disk() {
   free="$(free_disk_gb)"
   if [ -f "$state_dir/setup-complete" ] || [ "$free" -ge "$setup_disk_gb" ]; then check_ok "$free GB free on disk"
   else check_fail "Setup needs $setup_disk_gb GB free on disk; there are $free GB"; fi
+}
+
+# The VM gets what setup asks for, not what the machine has, so the request is checked as well.
+check_vm_size() {
+  [ "$runtime" = "colima" ] && [ -n "${memory:-}" ] || return 0
+  local total cores problems=0
+  total="$(total_memory_gb)"
+  cores="$(cpu_count)"
+  if [ "$memory" -lt 8 ]; then check_fail "--memory $memory is too little: the model needs a VM of 8 GB or more"; problems=1
+  elif [ "$memory" -gt "$total" ]; then check_fail "--memory $memory is more than the $total GB this machine has"; problems=1; fi
+  if [ "$cpus" -lt 1 ] || [ "$cpus" -gt "$cores" ]; then check_fail "--cpus $cpus is more than the $cores this machine has, or none"; problems=1; fi
+  if [ "$disk" -lt "$setup_disk_gb" ]; then check_fail "--disk $disk is too small: the images and models need $setup_disk_gb GB"; problems=1; fi
+  if [ "$problems" = 0 ]; then check_ok "a VM of $cpus CPUs, $memory GB of memory and $disk GB of disk fits"; fi
 }
 
 check_port() {
@@ -392,20 +411,26 @@ run_checks() {
   check_tools
   check_memory
   check_disk
+  check_vm_size
   check_port
   check_downloads
   restore_docker_context
   if [ "$check_failures" -gt 0 ]; then fail "Fix the $check_failures problem(s) above, then run setup again"; fi
 }
 
+whole_number() { [[ "$2" =~ ^[0-9]+$ ]] || fail "$1 takes a whole number"; }
+
 command_setup() {
   cpus="$(default_cpus)"; memory="$(default_memory_gb)"; disk=80
   while [ $# -gt 0 ]; do
     case "$1" in
       --gpu) save_setting OFFEE_GPU 1; OFFEE_GPU=1 ;;
-      --cpus) cpus="$2"; shift ;;
-      --memory) memory="$2"; shift ;;
-      --disk) disk="$2"; shift ;;
+      --cpus) whole_number "$1" "${2:-}"; cpus="$2"; shift ;;
+      --memory) whole_number "$1" "${2:-}"; memory="$2"; shift ;;
+      --disk) whole_number "$1" "${2:-}"; disk="$2"; shift ;;
+      --runtime)
+        case "${2:-}" in colima|docker) ;; *) fail "--runtime takes colima or docker" ;; esac
+        runtime="$2"; save_setting OFFEE_RUNTIME "$2"; shift ;;
       --yes) OFFEE_YES=1 ;;
       *) fail "Unknown option $1" ;;
     esac
@@ -517,11 +542,88 @@ command_destroy() {
   info "Deleted. Your keys and settings stay in $state_dir"
 }
 
+# Offee on a server of your own, driven over SSH. The server runs this same launcher, and Offee
+# there still publishes its port on the server's 127.0.0.1 only: the one way in is an SSH tunnel,
+# and the switch stays with whoever can log in to the server. The code goes to ~/offee there.
+
+# Every other command runs on the server; the server has no one at its screen to open a browser.
+remote_run() {
+  ssh -t "$target" "OFFEE_NO_BROWSER=1 offee/bin/offee$(printf ' %q' "$@")"
+}
+
+remote_port() {
+  local port
+  port="$(ssh "$target" 'sed -n "s/^OFFEE_PORT=//p" "${OFFEE_HOME:-$HOME/.offee}/settings.env" 2>/dev/null' || true)"
+  printf '%s' "${port:-8470}"
+}
+
+# Proves from this side that the server does not serve Offee on its own address. If it answers,
+# something on the server forwards the port, and the deploy fails rather than leave it open.
+check_not_public() {
+  local address port
+  address="$(ssh -G "$target" | awk '$1 == "hostname" { print $2; exit }')"
+  port="$(remote_port)"
+  [[ "$address" == *:* ]] && address="[$address]"
+  if curl -s -o /dev/null --connect-timeout 5 --max-time 10 "http://$address:$port/"; then
+    fail "Offee answers on $address:$port for anyone who can reach the server. Close that port on the server; Offee is meant to be reached only through: offee remote $target tunnel"
+  fi
+  info "Offee does not answer on $address:$port from here, as it should"
+}
+
+remote_deploy() {
+  git -C "$repo_root" rev-parse --verify -q HEAD >/dev/null || fail "remote deploy sends this repository's last commit: run it from a git clone of Offee"
+  bold "Copying Offee's last commit to $target:~/offee"
+  [ -z "$(git -C "$repo_root" status --porcelain)" ] || info "uncommitted changes stay here; only the last commit is sent"
+  # The code is replaced whole. Offee's data lives in the server's VM and ~/.offee, never here.
+  git -C "$repo_root" archive --format=tar HEAD |
+    ssh "$target" 'rm -rf offee.new && mkdir offee.new && tar -x -C offee.new && rm -rf offee && mv offee.new offee'
+  # The machine check runs on the server, so a server short of memory, disk or virtualization
+  # stops here, before anything is downloaded.
+  if ssh "$target" 'test -f "${OFFEE_HOME:-$HOME/.offee}/setup-complete"'; then remote_run update
+  else remote_run setup "$@"; fi
+  check_not_public
+  bold "Offee runs on $target. Reach it from this machine with: offee remote $target tunnel"
+}
+
+remote_tunnel() {
+  local local_port="$OFFEE_PORT" server_port
+  if [ "${1:-}" = "--port" ]; then whole_number --port "${2:-}"; local_port="$2"; fi
+  server_port="$(remote_port)"
+  bold "Tunnel to Offee on $target: http://127.0.0.1:$local_port (Ctrl-C closes it)"
+  # The browser opens once the tunnel carries Offee's answer, while ssh holds the tunnel open.
+  (
+    for _ in $(seq 1 30); do
+      if curl -sf "http://127.0.0.1:$local_port/api/status" >/dev/null 2>&1; then OFFEE_PORT="$local_port"; open_browser; exit 0; fi
+      sleep 1
+    done
+  ) &
+  trap 'explained=1; exit 0' INT
+  # Both ends bind loopback: the tunnel is not shared with this machine's network either.
+  ssh -N -o ExitOnForwardFailure=yes -L "127.0.0.1:$local_port:127.0.0.1:$server_port" "$target" ||
+    fail "The tunnel closed. If port $local_port is taken on this machine, pick another: offee remote $target tunnel --port 8471"
+}
+
+command_remote() {
+  target="${1:-}"
+  # A host starting with a dash would reach ssh as one of its options.
+  if [ -z "$target" ] || [ -z "${2:-}" ] || [[ "$target" == -* ]]; then
+    fail "Usage: offee remote <ssh-host> deploy [setup options] | tunnel [--port N] | <command>"
+  fi
+  require_command ssh || fail "remote needs ssh"
+  shift
+  case "$1" in
+    deploy) shift; remote_deploy "$@" ;;
+    tunnel) shift; remote_tunnel "$@" ;;
+    remote) fail "remote runs on this machine only" ;;
+    *) remote_run "$@" ;;
+  esac
+}
+
 usage() {
   cat <<'USAGE'
 offee: an office assistant sealed in a VM on this machine
 
-  offee setup [--gpu] [--cpus N] [--memory GB] [--disk GB] [--yes]
+  offee setup [--gpu] [--cpus N] [--memory GB] [--disk GB] [--runtime colima|docker] [--yes]
                          install what is missing, create the VM, download models, start
   offee check            check this machine and clear what a failed setup left behind
   offee start | stop | status | open | logs [service]
@@ -534,6 +636,13 @@ offee: an office assistant sealed in a VM on this machine
   offee update           rebuild after pulling a newer Offee
   offee selftest         prove the app reaches neither the internet nor your files
   offee destroy          delete the VM and all its data
+
+  offee remote <ssh-host> deploy [setup options]
+                         copy this repository's last commit to a server and set it up there
+  offee remote <ssh-host> tunnel [--port N]
+                         reach Offee on the server: the only way in
+  offee remote <ssh-host> <command>
+                         run any command above on the server, e.g. switch ask
 USAGE
 }
 
@@ -552,9 +661,10 @@ case "${1:-help}" in
   ctl) shift; gateway_ctl "$@" ;;
   key) shift; command_key "$@" ;;
   model) shift; command_model "$@" ;;
-  update) compose build && compose up -d && wait_for_app ;;
+  update) restore_docker_context; start_vm; compose build && compose up -d && wait_for_app ;;
   selftest) command_selftest ;;
   destroy) command_destroy ;;
+  remote) shift; command_remote "$@" ;;
   help|--help|-h) usage ;;
   *) usage; explained=1; exit 2 ;;
 esac
