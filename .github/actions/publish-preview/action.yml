@@ -1,0 +1,42 @@
+name: Publish a preview release
+description: >
+  Replaces a rolling pre-release with the files given. Several pull requests can build at once:
+  a build never replaces one that already contains it, so the download stays the newest of a
+  stack of pull requests. Callers serialise with a concurrency group per tag.
+inputs:
+  tag:
+    description: The pre-release's tag, such as mac-preview
+    required: true
+  title:
+    description: The release title
+    required: true
+  notes:
+    description: What to say above the downloads
+    required: true
+  files:
+    description: Files to attach, separated by spaces
+    required: true
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        GH_REPO: ${{ github.repository }}
+        TARGET: ${{ github.event.pull_request.head.sha || github.sha }}
+        TAG: ${{ inputs.tag }}
+        TITLE: ${{ inputs.title }}
+        NOTES: ${{ inputs.notes }}
+        FILES: ${{ inputs.files }}
+      run: |
+        current="$(gh release view "$TAG" --json targetCommitish --jq .targetCommitish 2>/dev/null || true)"
+        if [ -n "$current" ]; then
+          relation="$(gh api "repos/$GH_REPO/compare/$TARGET...$current" --jq .status 2>/dev/null || true)"
+          if [ "$relation" = "ahead" ] || [ "$relation" = "identical" ]; then
+            echo "$TAG is built from $current, which already contains $TARGET"
+            exit 0
+          fi
+        fi
+        gh release delete "$TAG" --yes --cleanup-tag || true
+        # FILES is a list of paths, so it is split on purpose.
+        gh release create "$TAG" $FILES --prerelease --target "$TARGET" --title "$TITLE" --notes "Built from $TARGET. $NOTES"

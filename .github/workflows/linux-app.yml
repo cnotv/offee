@@ -1,0 +1,96 @@
+name: Linux app
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    strategy:
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            arch: x64
+          - runner: ubuntu-24.04-arm
+            arch: arm64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @offee/desktop build
+      - run: pnpm --filter @offee/desktop package:linux
+
+      # apt resolves the package's dependencies the way it would on someone's machine.
+      - name: Install the package
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb imagemagick "./apps/desktop/build/Offee-linux-${{ matrix.arch }}.deb"
+          [ "$(stat -c '%a %U' /opt/Offee/chrome-sandbox)" = "4755 root" ]
+          grep -q "Exec=/opt/Offee/offee" /usr/share/applications/offee.desktop
+
+      # The launcher that ships inside the package, run from where the package put it.
+      - name: Packaged launcher
+        run: |
+          check="$(OFFEE_HOME="$RUNNER_TEMP/offee-home" OFFEE_RUNTIME=docker /opt/Offee/resources/offee/bin/offee check < /dev/null 2>&1 || true)"
+          echo "$check"
+          echo "$check" | grep -q "ok    Linux on"
+          echo "$check" | grep -q "the download sites answer"
+          ! echo "$check" | grep -q "stopped unexpectedly"
+          ! echo "$check" | grep -qE "line [0-9]+:|unbound variable|syntax error"
+
+      # Opens the installed app with an empty state on a virtual display: the settings window
+      # must render through its preload and the Offee window must stay sealed, with Chromium's
+      # sandbox on.
+      - name: Smoke test
+        run: |
+          Xvfb :99 -screen 0 1440x900x24 > /dev/null 2>&1 &
+          export DISPLAY=:99
+          mkdir -p "$RUNNER_TEMP/standin"
+          echo '<!doctype html><title>Offee</title><p>Offee stand-in</p>' > "$RUNNER_TEMP/standin/index.html"
+          python3 -m http.server 8470 --bind 127.0.0.1 --directory "$RUNNER_TEMP/standin" > /dev/null 2>&1 &
+          OFFEE_HOME="$RUNNER_TEMP/offee-home" OFFEE_SMOKE_TEST=1 timeout 60 /opt/Offee/offee 2>&1 | tee "$RUNNER_TEMP/offee.log" || true
+          cat "$HOME/.config/Offee/logs/offee.log" 2>/dev/null || true
+          grep -q "smoke: settings window rendered" "$RUNNER_TEMP/offee.log"
+          grep -q "smoke: Offee window loaded and sealed" "$RUNNER_TEMP/offee.log"
+          OFFEE_HOME="$RUNNER_TEMP/offee-home" /opt/Offee/offee > /dev/null 2>&1 &
+          sleep 15
+          import -window root "apps/desktop/build/first-launch-${{ matrix.arch }}.png" || true
+          kill $!
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Offee-linux-${{ matrix.arch }}
+          path: |
+            apps/desktop/build/Offee-linux-${{ matrix.arch }}.deb
+            apps/desktop/build/Offee-linux-${{ matrix.arch }}.tar.gz
+            apps/desktop/build/first-launch-${{ matrix.arch }}.png
+
+  # A rolling pre-release, so the newest packages always have the same download page.
+  publish:
+    needs: package
+    runs-on: ubuntu-latest
+    concurrency:
+      group: linux-preview-release
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: Offee-linux-*
+          merge-multiple: true
+          path: dist
+      - uses: ./.github/actions/publish-preview
+        with:
+          tag: linux-preview
+          title: Offee for Linux (preview)
+          files: dist/Offee-linux-x64.deb dist/Offee-linux-x64.tar.gz dist/Offee-linux-arm64.deb dist/Offee-linux-arm64.tar.gz
+          notes: "The .deb is for Debian and Ubuntu. The .tar.gz runs anywhere once its chrome-sandbox is made setuid root (see the README). Install Colima and the Docker CLI with Compose first."
