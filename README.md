@@ -72,34 +72,29 @@ needs a Mac with Apple Silicon and 16 GB of memory.
 
 ## Isolation
 
-```
- host (macOS / Linux)                       VM (Colima)
-┌──────────────────────────┐   ┌──────────────────────────────────────────┐
-│ launcher (bin/offee)     │   │  app container        no network,        │
-│  - start / stop the VM   │   │  (UI, API, data)      no host folders    │
-│  - unlock the volume     │   │        │ internal network only           │
-│  - the switch: sealed /  │──►│  gateway container ── the only way out,  │
-│    ask / open for N min  │   │        │              closed by default  │
-│  - approval prompts      │   │  inference container  llama.cpp,         │
-│ browser ── 127.0.0.1 ────┼──►│  (GPU via krunkit)    whisper.cpp        │
-└──────────────────────────┘   └──────────────────────────────────────────┘
-```
+![Offee runs in a Linux VM inside the Mac, in containers on an internal network; the gateway is the only way out and only the switch on the Mac opens it](docs/media/diagrams/how-it-fits.svg)
 
-- **The VM is the wall.** Colima runs one Linux VM, configured with no shared folders. The
-  app's data lives on an encrypted volume inside it.
-- **Files come and go through the browser.** You upload what the app may read and download
-  what it produces. It never reads a host path.
-- **The app container has no network.** It reaches only the inference and gateway containers
-  on an internal network.
-- **The gateway is the only way out.** It forwards to listed hosts only, adds API keys itself,
-  and obeys the switch:
-  - **Sealed:** nothing leaves.
-  - **Ask:** each request waits for your approval and shows exactly what would be sent.
-  - **Open for N minutes:** closes again on its own.
-- **Only the host launcher holds the switch.** It controls the gateway through the VM's
-  container socket, which the app container never gets, so a hostile document cannot open it.
-- **Documents are untrusted.** Whatever a document says, a persona keeps the tools its
-  definition gives it, and the closed gateway means nothing can be smuggled out.
+Offee runs in a Linux VM that shares no folder with the Mac, in containers on a network that
+leads nowhere. The gateway is the only way out, and only the switch on the Mac moves it:
+**Sealed** lets nothing out, **Ask** shows each request and waits for your yes, **Open for N
+minutes** closes again on its own. The switch talks to the gateway through the VM's container
+socket, which the app never gets, so a hostile document cannot open it. Whatever a document
+says, a persona keeps only the tools its definition gives it.
+
+### Your information
+
+![Files come in by upload and leave by download in the Offee window; everything in between lives in one database inside the VM](docs/media/diagrams/your-information.svg)
+
+### Encryption
+
+![The database sits inside a volume, inside the VM disk image, inside your user folder, on a disk FileVault encrypts; Offee has no passphrase of its own yet](docs/media/diagrams/encryption.svg)
+
+Offee relies on FileVault for now. A volume that opens only with your passphrase is
+[#3](https://github.com/cnotv/offee/issues/3).
+
+### What gets installed
+
+![On the Mac: Offee, Colima and the Docker CLI; inside the VM about 11 GB, mostly the chat model](docs/media/diagrams/installed.svg)
 
 ## Models
 
@@ -107,8 +102,9 @@ needs a Mac with Apple Silicon and 16 GB of memory.
   whisper.cpp transcribes; Tesseract 5.5 (English, German and Italian data, Apache 2.0, from Alpine's signed packages) reads scans and photos. On Apple Silicon the GPU reaches the VM
   through Colima's `krunkit` VM type.
 - **Remote, only through the switch:** Claude and other providers, per persona.
-- **Updates without a network:** models ship as signed bundles, verified offline and imported
-  through the browser. A manifest pins each by name, hash and licence.
+- **Updates without a network (planned, [#9](https://github.com/cnotv/offee/issues/9)):** models
+  shipped as signed bundles, verified offline and imported through the browser. Today they
+  download during setup.
 
 ## Platforms
 
