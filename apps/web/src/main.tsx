@@ -12,6 +12,7 @@ import { OperationsProvider } from '@/hooks/useOperations'
 import { WorkContextProvider } from '@/hooks/useWorkContext'
 import { WorkflowPagesProvider } from '@/hooks/useWorkflowPages'
 import { ChatView } from '@/views/ChatView'
+import { DataView } from '@/views/DataView'
 import { FormsView } from '@/views/FormsView'
 import { LibraryView } from '@/views/LibraryView'
 import { PersonasView } from '@/views/PersonasView'
@@ -35,6 +36,7 @@ const router = createBrowserRouter([
       { path: 'profiles', element: <ProfilesView />, handle: { title: 'Profiles' } },
       { path: 'personas', element: <PersonasView />, handle: { title: 'Personas' } },
       { path: 'runs', element: <RunsView />, handle: { title: 'Run log' } },
+      { path: 'data', element: <DataView />, handle: { title: 'Stored data' } },
     ],
   },
 ])

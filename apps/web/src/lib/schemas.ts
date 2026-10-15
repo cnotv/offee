@@ -127,6 +127,14 @@ export const runDetailSchema = runSummarySchema.extend({
   outbound: z.array(outboundRecordSchema),
 })
 
+export const storedItemSchema = z.object({
+  kind: z.enum(['profile', 'persona', 'document', 'file', 'run']),
+  id: z.string(),
+  title: z.string(),
+  bytes: z.number(),
+  createdAt: z.number(),
+})
+
 export const extractedTextSchema = z.object({ text: z.string() })
 
 export const errorBodySchema = z.object({ error: z.string() })
