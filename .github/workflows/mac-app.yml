@@ -11,6 +11,11 @@ permissions:
 jobs:
   package:
     runs-on: macos-15
+    outputs:
+      notarized: ${{ steps.keychain.outcome == 'success' }}
+    env:
+      # Secrets are empty for forks, which then get the ad hoc signed image.
+      SIGNING_CONFIGURED: ${{ secrets.MAC_CERTIFICATE_P12_BASE64 != '' }}
     steps:
       - uses: actions/checkout@v5
       - uses: pnpm/action-setup@v4
@@ -20,7 +25,33 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @offee/desktop build
+
+      # A throwaway keychain holding the Developer ID Application certificate, for codesign only.
+      - name: Signing keychain
+        id: keychain
+        if: env.SIGNING_CONFIGURED == 'true'
+        env:
+          MAC_CERTIFICATE_P12_BASE64: ${{ secrets.MAC_CERTIFICATE_P12_BASE64 }}
+          MAC_CERTIFICATE_PASSWORD: ${{ secrets.MAC_CERTIFICATE_PASSWORD }}
+        run: |
+          keychain="$RUNNER_TEMP/signing.keychain-db"
+          password="$(openssl rand -hex 24)"
+          echo "$MAC_CERTIFICATE_P12_BASE64" | base64 --decode > "$RUNNER_TEMP/certificate.p12"
+          security create-keychain -p "$password" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$password" "$keychain"
+          security import "$RUNNER_TEMP/certificate.p12" -k "$keychain" -P "$MAC_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          rm "$RUNNER_TEMP/certificate.p12"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$password" "$keychain" > /dev/null
+          security list-keychains -d user -s "$keychain" login.keychain-db
+          security find-identity -v -p codesigning "$keychain"
+          echo "OFFEE_SIGN_KEYCHAIN=$keychain" >> "$GITHUB_ENV"
+
       - run: pnpm --filter @offee/desktop package:mac
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
 
       # macOS's own Bash is 3.2, older than the one on Linux runners; the app runs the launcher
       # with it, so the launcher is exercised with it here, against a stand-in Docker CLI.
@@ -89,6 +120,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           TARGET: ${{ github.event.pull_request.head.sha || github.sha }}
+          NOTARIZED: ${{ needs.package.outputs.notarized }}
         run: |
           current="$(gh release view mac-preview --json targetCommitish --jq .targetCommitish 2>/dev/null || true)"
           if [ -n "$current" ]; then
@@ -98,7 +130,10 @@ jobs:
               exit 0
             fi
           fi
+          notes="Built from $TARGET. Apple Silicon only. Signed with a Developer ID and notarized by Apple."
+          if [ "$NOTARIZED" != "true" ]; then
+            notes="Built from $TARGET. Apple Silicon only. Not notarized: the first time, right-click Offee in Applications and choose Open (on macOS 15, allow it in System Settings, Privacy & Security)."
+          fi
           gh release delete mac-preview --yes --cleanup-tag || true
           gh release create mac-preview dist/Offee-arm64.dmg \
-            --prerelease --target "$TARGET" --title "Offee for Mac (preview)" \
-            --notes "Built from $TARGET. Apple Silicon only. Not notarized: the first time, right-click Offee in Applications and choose Open (on macOS 15, allow it in System Settings, Privacy & Security)."
+            --prerelease --target "$TARGET" --title "Offee for Mac (preview)" --notes "$notes"

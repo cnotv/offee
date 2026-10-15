@@ -139,9 +139,7 @@ On a Mac with Apple Silicon (macOS 13 or later, 16 GB of memory or more) with
 1. Download `Offee-arm64.dmg` from the
    [Mac preview release](https://github.com/cnotv/offee/releases/tag/mac-preview) and drag Offee to
    Applications.
-2. The app is not notarized yet, so the first time right-click it and choose **Open** (on
-   macOS 15: open it once, then allow it in System Settings, Privacy & Security).
-3. Choose **Set up Offee**. When setup finishes, Offee opens in its own window.
+2. Open it and choose **Set up Offee**. When setup finishes, Offee opens in its own window.
 
 The menu bar icon holds the switch. In **Ask** mode every outbound request appears as a Mac
 dialog showing exactly what would be sent; the page inside the VM can neither draw nor answer
@@ -216,6 +214,18 @@ Netlify publishes the UI alone for every pull request, in **demo mode** (`VITE_D
 `netlify.toml`): sample profiles, documents and runs, and canned answers held in the browser tab,
 since no Offee server runs there. `VITE_DEMO_MODE=1 pnpm --filter @offee/web dev` runs the same
 locally. A build without it carries no demo code.
+
+The `Mac app` workflow signs Offee with a Developer ID and has Apple notarize the disk image when
+these repository secrets are set; without them (forks) the image is signed ad hoc and macOS asks
+before the first launch, as the release notes then say.
+
+| Secret | What |
+| --- | --- |
+| `MAC_CERTIFICATE_P12_BASE64` | The Developer ID Application certificate and its private key, exported from Keychain Access as a `.p12` and encoded with `base64 -i Offee.p12 -o Offee.txt` |
+| `MAC_CERTIFICATE_PASSWORD` | The password chosen when exporting that `.p12` |
+| `APPLE_ID` | The Apple Account of the developer team |
+| `APPLE_APP_SPECIFIC_PASSWORD` | An app-specific password for that account, made at [account.apple.com](https://account.apple.com) under Sign-In and Security |
+| `APPLE_TEAM_ID` | The ten character team ID in the [membership details](https://developer.apple.com/account#MembershipDetailsCard) |
 
 ## Status
 
