@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import type { DocumentAssignment, DocumentSummary, FormField, Persona, Profile, RunDetail, RunSummary, WorkflowContext, WorkflowKind } from '@offee/contracts'
+import type { DocumentAssignment, DocumentSummary, FormField, Persona, Profile, RunDetail, RunSummary, StoredItem, StoredItemKind, WorkflowContext, WorkflowKind } from '@offee/contracts'
 import reviewTemplatesFile from '../../../../config/review-templates.json'
 import { reviewTemplateSchema } from '@/lib/schemas'
 import type { DemoDocument, OffeeApi } from '@/lib/types'
@@ -89,7 +89,7 @@ export const createDemoApi = (): OffeeApi => {
     personas: Persona[]
     documents: DemoDocument[]
     runs: RunDetail[]
-    files: Map<string, { name: string; url: string }>
+    files: Map<string, { name: string; url: string; bytes: number; createdAt: number }>
   } = {
     profiles: sampleProfiles,
     personas: samplePersonas,
@@ -127,7 +127,7 @@ export const createDemoApi = (): OffeeApi => {
 
   const keepFile = (file: File): string => {
     const id = newId()
-    memory.files.set(id, { name: file.name, url: URL.createObjectURL(file) })
+    memory.files.set(id, { name: file.name, url: URL.createObjectURL(file), bytes: file.size, createdAt: Date.now() })
     return id
   }
 
@@ -262,5 +262,29 @@ export const createDemoApi = (): OffeeApi => {
       return memory.runs.filter((candidate) => candidate.conversationId === run.conversationId).toSorted((first, second) => first.createdAt - second.createdAt)
     },
     fileUrl: (id) => memory.files.get(id)?.url ?? '#',
+    storedData: async () =>
+      [
+        ...memory.profiles.map((profile): StoredItem => ({ kind: 'profile', id: profile.id, title: profile.label, bytes: JSON.stringify(profile).length, createdAt: profile.createdAt })),
+        ...memory.personas.map((persona): StoredItem => ({ kind: 'persona', id: persona.id, title: persona.name, bytes: JSON.stringify(persona).length, createdAt: persona.createdAt })),
+        ...memory.documents.map((document): StoredItem => ({ kind: 'document', id: document.id, title: document.title, bytes: document.characterCount, createdAt: document.createdAt })),
+        ...[...memory.files].map(([id, file]): StoredItem => ({ kind: 'file', id, title: file.name, bytes: file.bytes, createdAt: file.createdAt })),
+        ...memory.runs.map((run): StoredItem => ({ kind: 'run', id: run.id, title: run.title, bytes: run.input.length + run.output.length, createdAt: run.createdAt })),
+      ].toSorted((first, second) => second.createdAt - first.createdAt),
+    deleteStoredItems: async (items) => {
+      const chosen = new Set(items.map(({ kind, id }) => `${kind}:${id}`))
+      const kept = (kind: StoredItemKind) => (item: { id: string }) => !chosen.has(`${kind}:${item.id}`)
+      memory.profiles = memory.profiles.filter(kept('profile'))
+      memory.personas = memory.personas.filter(kept('persona'))
+      memory.documents = memory.documents.filter(kept('document'))
+      memory.runs = memory.runs.filter(kept('run'))
+      items.filter((item) => item.kind === 'file').forEach((item) => memory.files.delete(item.id))
+    },
+    deleteAllStoredData: async () => {
+      memory.profiles = []
+      memory.personas = []
+      memory.documents = []
+      memory.files.clear()
+      memory.runs = []
+    },
   }
 }

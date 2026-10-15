@@ -14,6 +14,7 @@ import {
   reviewTemplateSchema,
   runDetailSchema,
   runSummarySchema,
+  storedItemSchema,
   transcriptionResultSchema,
   workflowResultSchema,
 } from './schemas'
@@ -84,4 +85,9 @@ export const httpApi: OffeeApi = {
   run: (id) => getJson(`/api/runs/${id}`, runDetailSchema),
   runConversation: (id) => getJson(`/api/runs/${id}/conversation`, z.array(runDetailSchema)),
   fileUrl: (id) => `/api/files/${id}`,
+  storedData: () => getJson('/api/stored-data', z.array(storedItemSchema)),
+  deleteStoredItems: async (items) => {
+    await sendJson('POST', '/api/stored-data/delete', { items }, z.object({ removed: z.number() }))
+  },
+  deleteAllStoredData: () => sendWithoutAnswer('DELETE', '/api/stored-data'),
 }

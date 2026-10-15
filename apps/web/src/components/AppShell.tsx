@@ -1,5 +1,6 @@
 import {
   ActivityLogIcon,
+  ArchiveIcon,
   ChatBubbleIcon,
   FileTextIcon,
   GlobeIcon,
@@ -32,12 +33,16 @@ const navigationItems: { title: string; path: string; Icon: typeof ChatBubbleIco
   { title: 'Profiles', path: '/profiles', Icon: IdCardIcon },
   { title: 'Personas', path: '/personas', Icon: PersonIcon },
   { title: 'Run log', path: '/runs', Icon: ActivityLogIcon },
+  { title: 'Stored data', path: '/data', Icon: ArchiveIcon },
 ]
 
 const readPageTitle = (handle: unknown): string | null =>
   typeof handle === 'object' && handle !== null && 'title' in handle && typeof handle.title === 'string' ? handle.title : null
 
 type LoadedStatus = { status: AppStatus; loadedAt: number }
+
+// The desktop app shows Offee under its own bar, which already carries the logo.
+const inDesktopApp = navigator.userAgent.includes('Electron/')
 
 // The time is taken when the status arrives, so rendering stays pure.
 const loadStatus = async (): Promise<LoadedStatus> => ({ status: await api.status(), loadedAt: Date.now() })
@@ -88,12 +93,14 @@ export const AppShell = () => {
   return (
     <div className="app-shell">
       <nav className="app-sidebar" aria-label="Main">
-        <Flex align="center" gap="2" className="app-sidebar-title">
-          <img src="/favicon.svg" width={24} height={24} alt="" />
-          <Text size="3" weight="bold">
-            Offee
-          </Text>
-        </Flex>
+        {!inDesktopApp && (
+          <Flex align="center" gap="2" className="app-sidebar-title">
+            <img src="/favicon.svg" width={24} height={24} alt="" />
+            <Text size="3" weight="bold">
+              Offee
+            </Text>
+          </Flex>
+        )}
         <Flex direction={{ initial: 'row', sm: 'column' }} wrap={{ initial: 'wrap', sm: 'nowrap' }} gap="1">
           {navigationItems.map(({ title, path, Icon, page }) => (
             <NavLink key={path} to={path} className="app-nav-link">

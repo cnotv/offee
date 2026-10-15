@@ -6,6 +6,17 @@ const context = { profileId: 'profile-work', personaId: null }
 const running = new AbortController().signal
 
 describe('createDemoApi', () => {
+  it('lists the stored data and deletes one item or everything', async () => {
+    const api = createDemoApi()
+    const items = await api.storedData()
+    expect(new Set(items.map((item) => item.kind))).toEqual(new Set(['profile', 'persona', 'document', 'run']))
+    await api.deleteStoredItems([{ kind: 'profile', id: 'profile-work' }, ...items.filter((item) => item.kind === 'run').map(({ kind, id }) => ({ kind, id }))])
+    expect((await api.profiles()).map((profile) => profile.id)).not.toContain('profile-work')
+    expect(await api.runs()).toEqual([])
+    await api.deleteAllStoredData()
+    expect(await api.storedData()).toEqual([])
+  })
+
   it('answers a chat from the documents the profile may use and records the run', async () => {
     const api = createDemoApi()
     const answer = await api.chat({ ...context, conversationId: sampleConversationId, history: [], message: 'Do flights need approval?' }, running)

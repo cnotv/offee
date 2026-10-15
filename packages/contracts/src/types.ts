@@ -223,3 +223,18 @@ export type PendingRequest = {
   bodyBytes: number
   bodyPreview: string
 }
+
+export type StoredItemKind = 'profile' | 'persona' | 'document' | 'file' | 'run'
+
+/** One thing Offee keeps in its database, for the Stored data page. */
+export type StoredItem = {
+  kind: StoredItemKind
+  id: string
+  title: string
+  /** Approximate: the stored text and file content, not the database's own overhead. */
+  bytes: number
+  createdAt: number
+}
+
+/** Which stored items to delete at once. */
+export type StoredItemKey = Pick<StoredItem, 'kind' | 'id'>

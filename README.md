@@ -142,12 +142,16 @@ On a Mac with Apple Silicon (macOS 13 or later, 16 GB of memory or more) with
    Applications.
 2. The app is not notarized yet, so the first time right-click it and choose **Open** (on
    macOS 15: open it once, then allow it in System Settings, Privacy & Security).
-3. Choose **Set up Offee**. When setup finishes, Offee opens in its own window.
+3. Choose **Set up Offee**. When setup finishes, Offee fills the window, under a bar with the
+   status, the switch and **Settings**.
+
+![The Mac app: Offee fills the window under a bar with its status, the switch and Settings](docs/media/desktop-one-window.png)
 
 The menu bar icon holds the switch. In **Ask** mode every outbound request appears as a Mac
 dialog showing exactly what would be sent; the page inside the VM can neither draw nor answer
-that dialog. **Settings and setup…** stores the Anthropic key, runs the isolation check, and
-starts or stops the VM. Quitting the app stops the VM. When something goes wrong, **Show log
+that dialog. **Settings** in the bar, or **Settings and setup…** in the menu, turns the window
+into the settings, which store the Anthropic key, run the isolation check, and start or stop
+the VM; **Back to Offee** returns to the page as you left it. Quitting the app stops the VM. When something goes wrong, **Show log
 file** in the same menu opens `~/Library/Logs/Offee/offee.log`, which holds every launcher run
 and error.
 
@@ -158,11 +162,13 @@ afterwards rebuilds the containers. An app that runs from elsewhere opens the di
 you to drag over instead. The checksum proves the file is the one GitHub serves, not who built
 it: the app is not notarized.
 
-The window that shows Offee is a locked-down browser: no Node.js, no bridge to the app, no
-permissions but copying text, and no request, link or navigation off `127.0.0.1:8470`. That
+The bar and the settings are one page and Offee is another, in two views of the one window,
+never one inside the other. The view that shows Offee is a locked-down browser: no Node.js,
+no bridge to the app, no permissions but copying text, and no request, link or navigation off
+`127.0.0.1:8470`. That
 last part matters: the page comes from the VM but runs on the Mac, which has a network. In an
 ordinary browser a compromised app could send data out from the page itself, around the
-gateway; the Mac app's window cannot, because the host blocks it, not the page.
+gateway; the Mac app's Offee view cannot, because the host blocks it, not the page.
 
 ### The Linux app
 

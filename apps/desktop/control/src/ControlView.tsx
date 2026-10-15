@@ -1,7 +1,8 @@
-import { ExternalLinkIcon, LockClosedIcon, LockOpen1Icon, PlayIcon, StopIcon } from '@radix-ui/react-icons'
+import { ArrowLeftIcon, GearIcon, LockClosedIcon, LockOpen1Icon, PlayIcon, StopIcon } from '@radix-ui/react-icons'
 import { Badge, Box, Button, Callout, Card, Flex, Heading, SegmentedControl, Separator, Text, TextField } from '@radix-ui/themes'
 import { useEffect, useRef, useState } from 'react'
 import type { ControlState, SwitchRequest } from '../../src/types.ts'
+import logoUrl from '../../../web/public/favicon.svg'
 
 const control = window.offeeControl
 
@@ -48,6 +49,21 @@ const updateText = (state: ControlState): string => {
   return `${build}. Checked only when you ask, from this computer; nothing comes from Offee itself.`
 }
 
+const PhaseBadge = ({ state }: { state: ControlState }) => (
+  <Badge size="2" color={state.phase === 'running' ? 'grass' : state.phase === 'failed' ? 'red' : 'gray'} variant="soft">
+    {phaseText[state.phase]}
+  </Badge>
+)
+
+const SwitchControl = ({ snapshot, size, onChange }: { snapshot: Snapshot; size: '1' | '2'; onChange: (request: SwitchRequest) => void }) => (
+  <SegmentedControl.Root size={size} value={switchValue(snapshot)} onValueChange={(value) => onChange(requestFor(value))}>
+    <SegmentedControl.Item value="sealed">Sealed</SegmentedControl.Item>
+    <SegmentedControl.Item value="ask">Ask</SegmentedControl.Item>
+    <SegmentedControl.Item value="open-15">Open 15 min</SegmentedControl.Item>
+    <SegmentedControl.Item value="open-60">Open 1 hour</SegmentedControl.Item>
+  </SegmentedControl.Root>
+)
+
 /** The host-side settings: setup, start and stop, the switch, and the key for Claude. */
 export const ControlView = () => {
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null)
@@ -75,14 +91,41 @@ export const ControlView = () => {
   const { state } = snapshot
   const running = state.phase === 'running'
   const working = ['setting-up', 'starting', 'stopping', 'checking'].includes(state.phase)
+  const setSwitch = (request: SwitchRequest) => run(() => control.setSwitch(request))
+
+  // Above the Offee page, this page shrinks to one bar; the window keeps the two apart.
+  if (state.view === 'offee') {
+    return (
+      <Flex align="center" justify="between" gap="3" className="control-toolbar">
+        <Flex align="center" gap="2">
+          <img src={logoUrl} width={24} height={24} alt="" />
+          <Text size="3" weight="bold">
+            Offee
+          </Text>
+          <PhaseBadge state={state} />
+        </Flex>
+        <Flex align="center" gap="3">
+          {running && <SwitchControl snapshot={snapshot} size="1" onChange={setSwitch} />}
+          <Button size="1" variant="soft" onClick={() => run(control.showSettings)}>
+            <GearIcon /> Settings
+          </Button>
+        </Flex>
+      </Flex>
+    )
+  }
 
   return (
     <Flex direction="column" gap="4" className="control-page">
-      <Flex justify="between" align="center">
+      <Flex justify="between" align="center" gap="3">
         <Heading size="5">Offee</Heading>
-        <Badge size="2" color={running ? 'grass' : state.phase === 'failed' ? 'red' : 'gray'} variant="soft">
-          {phaseText[state.phase]}
-        </Badge>
+        <Flex align="center" gap="3">
+          <PhaseBadge state={state} />
+          {running && (
+            <Button size="2" onClick={() => run(control.openOffee)}>
+              <ArrowLeftIcon /> Back to Offee
+            </Button>
+          )}
+        </Flex>
       </Flex>
 
       {state.message !== null && (
@@ -137,12 +180,7 @@ export const ControlView = () => {
               </Text>
               {state.gateway?.mode === 'open' ? <LockOpen1Icon /> : <LockClosedIcon />}
             </Flex>
-            <SegmentedControl.Root value={switchValue(snapshot)} onValueChange={(value) => run(() => control.setSwitch(requestFor(value)))}>
-              <SegmentedControl.Item value="sealed">Sealed</SegmentedControl.Item>
-              <SegmentedControl.Item value="ask">Ask</SegmentedControl.Item>
-              <SegmentedControl.Item value="open-15">Open 15 min</SegmentedControl.Item>
-              <SegmentedControl.Item value="open-60">Open 1 hour</SegmentedControl.Item>
-            </SegmentedControl.Root>
+            <SwitchControl snapshot={snapshot} size="2" onChange={setSwitch} />
             <Text size="1" color="gray">
               Sealed: nothing leaves. Ask: each request waits for you in a dialog showing what would be sent. Open: listed destinations only,
               closing again on its own.
@@ -175,9 +213,6 @@ export const ControlView = () => {
             </Flex>
             <Separator size="4" />
             <Flex gap="2" wrap="wrap">
-              <Button onClick={() => run(control.openOffee)}>
-                <ExternalLinkIcon /> Open Offee
-              </Button>
               <Button variant="soft" loading={busy} onClick={() => run(control.runSelftest)}>
                 Check isolation
               </Button>

@@ -20,6 +20,8 @@ import type {
   ReviewTemplate,
   RunDetail,
   RunSummary,
+  StoredItem,
+  StoredItemKey,
   TranscriptionResult,
   TranslateRequest,
   WorkflowContext,
@@ -122,4 +124,7 @@ export type OffeeApi = {
   run: (id: string) => Promise<RunDetail>
   runConversation: (id: string) => Promise<RunDetail[]>
   fileUrl: (id: string) => string
+  storedData: () => Promise<StoredItem[]>
+  deleteStoredItems: (items: StoredItemKey[]) => Promise<void>
+  deleteAllStoredData: () => Promise<void>
 }
