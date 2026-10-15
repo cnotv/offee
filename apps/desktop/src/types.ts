@@ -10,11 +10,15 @@ export type UpdateState =
   | { status: 'installing' }
   | { status: 'notice'; message: string }
 
+/** What the one window shows: Offee under the settings bar, or the settings in full. */
+export type WindowView = 'offee' | 'settings'
+
 export type ControlState = {
   phase: AppPhase
   gateway: GatewayStatus | null
   hasAnthropicKey: boolean
   message: string | null
+  view: WindowView
   buildCommit: string
   update: UpdateState
 }
@@ -37,6 +41,10 @@ export type Release = {
   commit: string
   assets: { name: string; url: string; digest: string | null }[]
 }
+
+export type Rectangle = { x: number; y: number; width: number; height: number }
+
+export type ViewLayout = { settings: Rectangle; offee: Rectangle | null }
 
 export type SwitchRequest = { mode: Exclude<SwitchMode, 'open'> } | { mode: 'open'; minutes: number }
 
@@ -83,4 +91,5 @@ export type ControlApi = {
   openOffee: () => Promise<void>
   checkForUpdate: () => Promise<void>
   installUpdate: () => Promise<void>
+  showSettings: () => Promise<void>
 }

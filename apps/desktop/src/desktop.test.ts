@@ -3,6 +3,7 @@ import { approvalPromptFor, parsePendingReply, parseStatusReply, requestsToAsk, 
 import { describeFailure } from './setup-messages.ts'
 import { trayEntries } from './tray-menu.ts'
 import { assetNameFor, digestMatches, installKindFor, parseRelease, releaseTagFor, startCommandFor, updateFor } from './updates.ts'
+import { layoutViews, toolbarHeight } from './window-layout.ts'
 import { isAllowedRequestUrl, isOffeeUrl, isPermissionAllowed, pathWithHomebrew, progressAsLines } from './window-policy.ts'
 
 const request = (id: string, createdAt: number) => ({
@@ -196,5 +197,30 @@ describe('updating the app', () => {
     expect(startCommandFor(newer, current, true)).toBe('update')
     expect(startCommandFor(current, current, true)).toBe('start')
     expect(startCommandFor(newer, current, false)).toBe('start')
+  })
+})
+
+describe('the one window', () => {
+  const full = { width: 1320, height: 880 }
+  const sizes = [
+    full,
+    { width: 400, height: 300 },
+    { width: 200, height: 20 },
+  ]
+
+  it('puts the settings bar above Offee without overlapping, at any size', () => {
+    sizes.forEach((size) => {
+      const layout = layoutViews(size, 'offee', true)
+      expect(layout.settings).toEqual({ x: 0, y: 0, width: size.width, height: Math.min(toolbarHeight, size.height) })
+      expect(layout.offee).not.toBeNull()
+      expect(layout.offee?.y).toBe(layout.settings.height)
+      expect((layout.offee?.y ?? 0) + (layout.offee?.height ?? 0)).toBe(size.height)
+      expect(layout.offee?.width).toBe(size.width)
+    })
+  })
+
+  it('gives the settings the whole window when they are chosen or Offee is not open', () => {
+    expect(layoutViews(full, 'settings', true)).toEqual({ settings: { x: 0, y: 0, width: 1320, height: 880 }, offee: null })
+    expect(layoutViews(full, 'offee', false)).toEqual({ settings: { x: 0, y: 0, width: 1320, height: 880 }, offee: null })
   })
 })

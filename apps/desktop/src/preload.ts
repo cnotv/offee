@@ -17,6 +17,7 @@ const stateSchema = z.object({
     z.object({ status: z.literal('installing') }),
     z.object({ status: z.literal('notice'), message: z.string() }),
   ]),
+  view: z.enum(['offee', 'settings']),
 })
 
 const readState = (value: unknown): ControlState => stateSchema.parse(value)
@@ -42,6 +43,7 @@ const api: ControlApi = {
   openOffee: () => invoke('offee:open-offee'),
   checkForUpdate: () => invoke('offee:check-update'),
   installUpdate: () => invoke('offee:install-update'),
+  showSettings: () => invoke('offee:show-settings'),
 }
 
 contextBridge.exposeInMainWorld('offeeControl', api)
