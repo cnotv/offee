@@ -56,6 +56,7 @@ export const trayEntries = (phase: AppPhase, gateway: GatewayStatus | null, now:
     { type: 'action', label: 'Open Offee', action: { kind: 'open-offee' }, enabled: running },
     { type: 'action', label: 'Settings and setup…', action: { kind: 'open-control' }, enabled: true },
     ...startAndStopEntries(phase),
+    { type: 'action', label: 'Check for updates…', action: { kind: 'check-update' }, enabled: true },
     { type: 'action', label: 'Show log file', action: { kind: 'show-log' }, enabled: true },
     { type: 'separator' },
     { type: 'action', label: 'Quit', action: { kind: 'quit' }, enabled: true },

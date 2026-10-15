@@ -2,11 +2,40 @@ import type { GatewayStatus, PendingRequest, SwitchMode } from '@offee/contracts
 
 export type AppPhase = 'checking' | 'needs-setup' | 'setting-up' | 'starting' | 'running' | 'stopping' | 'stopped' | 'failed'
 
+export type UpdateState =
+  | { status: 'idle' }
+  | { status: 'checking' }
+  | { status: 'current' }
+  | { status: 'available'; commit: string }
+  | { status: 'installing' }
+  | { status: 'notice'; message: string }
+
 export type ControlState = {
   phase: AppPhase
   gateway: GatewayStatus | null
   hasAnthropicKey: boolean
   message: string | null
+  buildCommit: string
+  update: UpdateState
+}
+
+/** How this copy of the app was installed, which decides how it is updated. */
+export type InstallKind = 'replace-app' | 'open-disk-image' | 'deb' | 'release-page' | 'source'
+
+export type ReleaseAsset = {
+  name: string
+  url: string
+  digest: string
+}
+
+export type AvailableUpdate = {
+  commit: string
+  asset: ReleaseAsset | null
+}
+
+export type Release = {
+  commit: string
+  assets: { name: string; url: string; digest: string | null }[]
 }
 
 export type SwitchRequest = { mode: Exclude<SwitchMode, 'open'> } | { mode: 'open'; minutes: number }
@@ -19,6 +48,7 @@ export type TrayAction =
   | { kind: 'start' }
   | { kind: 'stop' }
   | { kind: 'show-log' }
+  | { kind: 'check-update' }
   | { kind: 'quit' }
 
 export type TrayEntry =
@@ -51,4 +81,6 @@ export type ControlApi = {
   saveAnthropicKey: (key: string) => Promise<void>
   runSelftest: () => Promise<void>
   openOffee: () => Promise<void>
+  checkForUpdate: () => Promise<void>
+  installUpdate: () => Promise<void>
 }

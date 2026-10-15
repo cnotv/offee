@@ -432,6 +432,10 @@ command_setup() {
 
 command_start() { restore_docker_context; start_vm; compose up -d; wait_for_app; }
 
+# A new Offee brings new compose files and sources; the VM may be stopped, as it is after the
+# app restarts to update.
+command_update() { restore_docker_context; start_vm; compose build; compose up -d; wait_for_app; }
+
 command_stop() {
   if [ "$runtime" = "colima" ] && ! colima status --profile "$profile" >/dev/null 2>&1; then
     info "Offee is not running"
@@ -552,7 +556,7 @@ case "${1:-help}" in
   ctl) shift; gateway_ctl "$@" ;;
   key) shift; command_key "$@" ;;
   model) shift; command_model "$@" ;;
-  update) compose build && compose up -d && wait_for_app ;;
+  update) command_update ;;
   selftest) command_selftest ;;
   destroy) command_destroy ;;
   help|--help|-h) usage ;;
