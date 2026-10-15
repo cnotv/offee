@@ -11,6 +11,8 @@ permissions:
 jobs:
   package:
     strategy:
+      # Each architecture reports its own result rather than cancelling the other.
+      fail-fast: false
       matrix:
         include:
           - runner: ubuntu-24.04

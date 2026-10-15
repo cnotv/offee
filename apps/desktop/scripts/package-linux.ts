@@ -16,6 +16,9 @@ prepareBuildDirectory()
 
 const appDirectory = await packageApp({ platform: 'linux', arch, executableName })
 await lockDownElectron(join(appDirectory, executableName))
+// The packager works in a private temporary directory, so its output is readable by its owner
+// only; installed under /opt that would be root, and nobody else could start the app.
+runCommand('chmod', ['-R', 'u+rwX,go+rX,go-w', appDirectory])
 
 const tarball = join(buildDirectory, `Offee-linux-${arch}.tar.gz`)
 runCommand('tar', ['-czf', tarball, '-C', join(appDirectory, '..'), `Offee-linux-${arch}`])
