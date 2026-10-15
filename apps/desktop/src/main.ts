@@ -4,16 +4,17 @@ import { mkdtemp } from 'node:fs/promises'
 import { homedir, tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, session, shell, Tray } from 'electron'
+import { app, BaseWindow, dialog, ipcMain, Menu, nativeImage, session, shell, Tray, WebContentsView } from 'electron'
 import type { IpcMainInvokeEvent, MenuItemConstructorOptions, WebContents } from 'electron'
 import { z } from 'zod'
 import { approvalPromptFor, parsePendingReply, parseStatusReply, requestsToAsk } from './gateway-replies.ts'
 import { runLauncher } from './launcher.ts'
 import { describeFailure } from './setup-messages.ts'
 import { trayEntries } from './tray-menu.ts'
-import type { AvailableUpdate, ControlState, InstallKind, PendingRequest, SwitchRequest, TrayAction, TrayEntry, UpdateState } from './types.ts'
+import type { AvailableUpdate, ControlState, InstallKind, PendingRequest, SwitchRequest, TrayAction, TrayEntry, UpdateState, WindowView } from './types.ts'
 import { downloadVerified, fetchRelease, installDebianPackage, replaceMacApp } from './update-install.ts'
 import { assetNameFor, installKindFor, macAppBundle, parseRelease, releasePageFor, releaseTagFor, startCommandFor, updateFor } from './updates.ts'
+import { layoutViews } from './window-layout.ts'
 import { isAllowedRequestUrl, isOffeeUrl, isPermissionAllowed, offeeOrigin, pathWithHomebrew, unreachableProxy } from './window-policy.ts'
 
 const distDirectory = dirname(fileURLToPath(import.meta.url))
@@ -41,8 +42,9 @@ const anthropicKeySchema = z.string().trim().min(20).max(500).regex(/^[\x21-\x7e
 const runtime: {
   state: ControlState
   tray: Tray | null
-  offeeWindow: BrowserWindow | null
-  controlWindow: BrowserWindow | null
+  window: BaseWindow | null
+  settingsView: WebContentsView | null
+  offeeView: WebContentsView | null
   askedRequestIds: Set<string>
   reviewing: boolean
   polling: boolean
@@ -50,10 +52,11 @@ const runtime: {
   longRunningLauncher: AbortController | null
   availableUpdate: AvailableUpdate | null
 } = {
-  state: { phase: 'checking', gateway: null, hasAnthropicKey: false, message: null, buildCommit, update: { status: 'idle' } },
+  state: { phase: 'checking', gateway: null, hasAnthropicKey: false, message: null, view: 'settings', buildCommit, update: { status: 'idle' } },
   tray: null,
-  offeeWindow: null,
-  controlWindow: null,
+  window: null,
+  settingsView: null,
+  offeeView: null,
   askedRequestIds: new Set(),
   reviewing: false,
   polling: false,
@@ -99,7 +102,7 @@ const recordBuiltCommit = (): void => writeFileSync(builtCommitFile, `${buildCom
 
 const sendLog = (text: string): void => {
   writeLog(text)
-  runtime.controlWindow?.webContents.send('offee:log', text)
+  runtime.settingsView?.webContents.send('offee:log', text)
 }
 
 const launcher = (args: string[], stdin?: string) => {
@@ -144,15 +147,26 @@ const refreshTray = (): void => {
   runtime.tray?.setContextMenu(Menu.buildFromTemplate(trayEntries(runtime.state.phase, runtime.state.gateway, Date.now()).map(toMenuItem)))
 }
 
+// The window holds two views, never one page inside the other: the settings page, with the
+// bridge to this process, and the Offee page from the VM, with nothing.
+const layOutWindow = (): void => {
+  if (runtime.window === null || runtime.settingsView === null) return
+  const [width = 0, height = 0] = runtime.window.getContentSize()
+  const layout = layoutViews({ width, height }, runtime.state.view, runtime.offeeView !== null)
+  runtime.settingsView.setBounds(layout.settings)
+  runtime.offeeView?.setVisible(layout.offee !== null)
+  if (layout.offee !== null) runtime.offeeView?.setBounds(layout.offee)
+}
+
 const updateState = (change: Partial<ControlState>): void => {
   runtime.state = { ...runtime.state, ...change, hasAnthropicKey: hasAnthropicKey() }
-  runtime.controlWindow?.webContents.send('offee:state', runtime.state)
+  runtime.settingsView?.webContents.send('offee:state', runtime.state)
+  layOutWindow()
   refreshTray()
 }
 
-// Page failures go to the log: a blank or vanished window is otherwise silent.
-const watchForPageFailures = (window: BrowserWindow, name: string): void => {
-  const contents = window.webContents
+// Page failures go to the log: a blank or vanished view is otherwise silent.
+const watchForPageFailures = (contents: WebContents, name: string): void => {
   const record = (text: string) => {
     writeLog(`${new Date().toISOString()} ${name} window: ${text}`)
     if (smokeTest) process.stderr.write(`smoke: ${name} window: ${text}\n`)
@@ -170,69 +184,86 @@ const allowOnlySafePermissions = (target: Electron.Session): void => {
   target.setPermissionCheckHandler((_contents, permission) => isPermissionAllowed(permission))
 }
 
-// The Offee page comes from inside the VM, so its window gets nothing of the host: no Node,
-// no preload, no messages to this process, and it cannot leave its own origin.
-const openOffeeWindow = (): void => {
-  if (runtime.offeeWindow !== null) {
-    runtime.offeeWindow.show()
-    return
+const openWindow = (): BaseWindow => {
+  if (runtime.window !== null) {
+    runtime.window.show()
+    return runtime.window
   }
-  const offeeSession = session.fromPartition('persist:offee')
-  allowOnlySafePermissions(offeeSession)
-  offeeSession.webRequest.onBeforeRequest((details, callback) => callback({ cancel: !isAllowedRequestUrl(details.url) }))
-  // WebRTC and DNS prefetching pass beside webRequest. A proxy that leads nowhere stops both:
-  // the page's own origin is loopback, which Chromium never sends through a proxy.
-  const sealSession = offeeSession.setProxy({ proxyRules: unreachableProxy })
-  const window = new BrowserWindow({
-    width: 1320,
-    height: 880,
-    title: 'Offee',
-    webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false, session: offeeSession },
-  })
-  window.on('closed', () => {
-    runtime.offeeWindow = null
-  })
-  runtime.offeeWindow = window
-  watchForPageFailures(window, 'Offee')
-  window.webContents.setWebRTCIPHandlingPolicy('disable_non_proxied_udp')
-  sealSession
-    .then(() => window.loadURL(offeeOrigin))
-    .catch((error: unknown) => {
-    writeLog(`${new Date().toISOString()} Offee did not answer: ${describeError(error)}`)
-    // Closing the window or quitting the app also ends the load; then there is nothing to report.
-    if (window.isDestroyed()) return
-    window.close()
-    updateState({ phase: 'failed', message: `Offee did not answer at ${offeeOrigin}. Try starting it again; the log is in ${logFile}.` })
-    openControlWindow()
-  })
-}
-
-const openControlWindow = (): void => {
-  if (runtime.controlWindow !== null) {
-    runtime.controlWindow.show()
-    return
-  }
-  const window = new BrowserWindow({
-    width: 680,
-    height: 760,
-    title: 'Offee settings',
+  const window = new BaseWindow({ width: 1320, height: 880, minWidth: 760, minHeight: 480, title: 'Offee' })
+  const settingsView = new WebContentsView({
     webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false, preload: join(distDirectory, 'preload.cjs') },
   })
+  window.contentView.addChildView(settingsView)
+  runtime.window = window
+  runtime.settingsView = settingsView
+  window.on('resize', layOutWindow)
+  // A view's page outlives its window unless it is closed with it.
   window.on('closed', () => {
-    runtime.controlWindow = null
+    settingsView.webContents.close()
+    runtime.offeeView?.webContents.close()
+    runtime.window = null
+    runtime.settingsView = null
+    runtime.offeeView = null
   })
-  runtime.controlWindow = window
-  watchForPageFailures(window, 'settings')
-  if (smokeTest) window.webContents.once('did-finish-load', () => void reportSmokeTest(window))
-  window.loadURL(controlPageUrl).catch(reportUnexpectedError)
+  watchForPageFailures(settingsView.webContents, 'settings')
+  if (smokeTest) settingsView.webContents.once('did-finish-load', () => void reportSmokeTest(settingsView.webContents))
+  settingsView.webContents.loadURL(controlPageUrl).catch(reportUnexpectedError)
+  layOutWindow()
+  return window
+}
+
+const showView = (view: WindowView): void => {
+  openWindow().focus()
+  updateState({ view })
+}
+
+const showSettings = (): void => showView('settings')
+
+const closeOffeeView = (): void => {
+  const view = runtime.offeeView
+  if (view === null) return
+  runtime.window?.contentView.removeChildView(view)
+  view.webContents.close()
+  runtime.offeeView = null
+  updateState({ view: 'settings' })
+}
+
+// The Offee page comes from inside the VM, so its view gets nothing of the host: no Node, no
+// preload, no messages to this process, and it cannot leave its own origin.
+const openOffee = (): void => {
+  const window = openWindow()
+  if (runtime.offeeView === null) {
+    const offeeSession = session.fromPartition('persist:offee')
+    allowOnlySafePermissions(offeeSession)
+    offeeSession.webRequest.onBeforeRequest((details, callback) => callback({ cancel: !isAllowedRequestUrl(details.url) }))
+    // WebRTC and DNS prefetching pass beside webRequest. A proxy that leads nowhere stops both:
+    // the page's own origin is loopback, which Chromium never sends through a proxy.
+    const sealSession = offeeSession.setProxy({ proxyRules: unreachableProxy })
+    const view = new WebContentsView({ webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false, session: offeeSession } })
+    window.contentView.addChildView(view)
+    runtime.offeeView = view
+    watchForPageFailures(view.webContents, 'Offee')
+    view.webContents.setWebRTCIPHandlingPolicy('disable_non_proxied_udp')
+    sealSession
+      .then(() => view.webContents.loadURL(offeeOrigin))
+      .catch((error: unknown) => {
+        writeLog(`${new Date().toISOString()} Offee did not answer: ${describeError(error)}`)
+        // Closing the window or quitting the app also ends the load; then there is nothing to report.
+        if (view.webContents.isDestroyed()) return
+        closeOffeeView()
+        updateState({ phase: 'failed', message: `Offee did not answer at ${offeeOrigin}. Try starting it again; the log is in ${logFile}.` })
+        showSettings()
+      })
+  }
+  showView('offee')
 }
 
 // CI opens the packaged app with OFFEE_SMOKE_TEST=1: the settings page must render through
 // its preload, or the build fails.
-const reportSmokeTest = async (window: BrowserWindow): Promise<void> => {
+const reportSmokeTest = async (contents: WebContents): Promise<void> => {
   // React renders after the load event, so give it a moment before reading the page.
   await new Promise((resolve) => setTimeout(resolve, 3000))
-  const page: unknown = await window.webContents.executeJavaScript(
+  const page: unknown = await contents.executeJavaScript(
     "JSON.stringify({ bridge: typeof window.offeeControl, text: document.body.innerText.slice(0, 300) })",
   )
   const rendered = typeof page === 'string' && page.includes('"bridge":"object"') && page.includes('Set up Offee')
@@ -241,17 +272,17 @@ const reportSmokeTest = async (window: BrowserWindow): Promise<void> => {
     app.exit(1)
     return
   }
-  // CI serves a stand-in page on the Offee port: the window must load it through its sealed
-  // session and still be unable to reach anything else.
-  openOffeeWindow()
-  runtime.offeeWindow?.webContents.once('did-finish-load', () => void reportOffeeWindowSmokeTest())
+  // CI serves a stand-in page on the Offee port: its view, in the same window as the settings,
+  // must load it through its sealed session, have no bridge, and reach nothing else.
+  openOffee()
+  runtime.offeeView?.webContents.once('did-finish-load', () => void reportOffeeWindowSmokeTest())
 }
 
 const reportOffeeWindowSmokeTest = async (): Promise<void> => {
-  const page: unknown = await runtime.offeeWindow?.webContents.executeJavaScript(
-    "fetch('https://example.com/', { mode: 'no-cors' }).then(() => 'reached', () => 'blocked').then((outside) => JSON.stringify({ outside, text: document.body.innerText.slice(0, 100) }))",
+  const page: unknown = await runtime.offeeView?.webContents.executeJavaScript(
+    "fetch('https://example.com/', { mode: 'no-cors' }).then(() => 'reached', () => 'blocked').then((outside) => JSON.stringify({ outside, bridge: typeof window.offeeControl, text: document.body.innerText.slice(0, 100) }))",
   )
-  const sealed = typeof page === 'string' && page.includes('Offee stand-in') && page.includes('"outside":"blocked"')
+  const sealed = typeof page === 'string' && page.includes('Offee stand-in') && page.includes('"outside":"blocked"') && page.includes('"bridge":"undefined"')
   process.stdout.write(`smoke: Offee window ${sealed ? 'loaded and sealed' : 'failed'}: ${String(page)}\n`)
   app.exit(sealed ? 0 : 1)
 }
@@ -283,10 +314,10 @@ const runSetup = async (): Promise<void> => {
   if (result.exitCode === 0) {
     recordBuiltCommit()
     updateState({ phase: 'running', message: null })
-    openOffeeWindow()
+    openOffee()
   } else {
     updateState({ phase: 'failed', message: describeFailure(result.output, logFile) })
-    openControlWindow()
+    showSettings()
   }
 }
 
@@ -297,17 +328,17 @@ const start = async (): Promise<void> => {
   if (result.exitCode === 0) {
     recordBuiltCommit()
     updateState({ phase: 'running', message: null })
-    openOffeeWindow()
+    openOffee()
   } else {
     updateState({ phase: 'failed', message: describeFailure(result.output, logFile) })
-    openControlWindow()
+    showSettings()
   }
 }
 
 const stop = async (): Promise<void> => {
   updateState({ phase: 'stopping' })
   cancelLongRunningLauncher()
-  runtime.offeeWindow?.close()
+  closeOffeeView()
   await launcher(['stop'])
   updateState({ phase: 'stopped', gateway: null })
 }
@@ -463,8 +494,8 @@ const installUpdate = async (): Promise<void> => {
 }
 
 const performTrayAction = async (action: TrayAction): Promise<void> => {
-  if (action.kind === 'open-offee') openOffeeWindow()
-  if (action.kind === 'open-control') openControlWindow()
+  if (action.kind === 'open-offee') openOffee()
+  if (action.kind === 'open-control') showSettings()
   if (action.kind === 'switch') await setSwitch(action.request)
   if (action.kind === 'review-requests') {
     runtime.askedRequestIds.clear()
@@ -474,7 +505,7 @@ const performTrayAction = async (action: TrayAction): Promise<void> => {
   if (action.kind === 'stop') await stop()
   if (action.kind === 'show-log') shell.showItemInFolder(logFile)
   if (action.kind === 'check-update') {
-    openControlWindow()
+    showSettings()
     await checkForUpdate()
   }
   if (action.kind === 'quit') app.quit()
@@ -498,7 +529,8 @@ const registerControlHandlers = (): void => {
   handle('offee:switch', async (_event, payload) => setSwitch(switchRequestSchema.parse(payload)))
   handle('offee:save-key', async (_event, payload) => saveAnthropicKey(anthropicKeySchema.parse(payload)))
   handle('offee:selftest', runSelftest)
-  handle('offee:open-offee', async () => openOffeeWindow())
+  handle('offee:open-offee', async () => openOffee())
+  handle('offee:show-settings', async () => showSettings())
   handle('offee:check-update', checkForUpdate)
   handle('offee:install-update', installUpdate)
 }
@@ -509,7 +541,7 @@ const lockDownWebContents = (contents: WebContents): void => {
   // carry data out of the VM around the gateway.
   contents.setWindowOpenHandler(() => ({ action: 'deny' }))
   contents.on('will-navigate', (event, url) => {
-    const allowed = contents === runtime.offeeWindow?.webContents ? isOffeeUrl(url) : url === controlPageUrl
+    const allowed = contents === runtime.offeeView?.webContents ? isOffeeUrl(url) : url === controlPageUrl
     if (!allowed) event.preventDefault()
   })
   contents.on('will-redirect', (event, url) => {
@@ -545,7 +577,7 @@ app.on('web-contents-created', (_event, contents) => lockDownWebContents(content
 app.on('window-all-closed', () => {
   // Offee keeps running from the menu bar.
 })
-const showWindow = (): void => (runtime.state.phase === 'running' ? openOffeeWindow() : openControlWindow())
+const showWindow = (): void => (runtime.state.phase === 'running' ? openOffee() : showSettings())
 app.on('activate', showWindow)
 // Many Linux desktops show no tray icon, so opening Offee again is how its windows come back.
 app.on('second-instance', showWindow)
@@ -571,7 +603,7 @@ const startApp = (): void => {
     void start()
   } else {
     updateState({ phase: 'needs-setup' })
-    openControlWindow()
+    showSettings()
   }
 }
 

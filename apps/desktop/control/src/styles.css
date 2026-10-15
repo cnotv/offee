@@ -4,7 +4,19 @@ body {
 }
 
 .control-page {
+  max-width: 720px;
+  margin: 0 auto;
   padding: var(--space-5);
+}
+
+/* The bar above Offee: one row at a fixed height, matching window-layout.ts. */
+.control-toolbar {
+  box-sizing: border-box;
+  height: 52px;
+  padding: 0 var(--space-4);
+  border-bottom: 1px solid var(--gray-a5);
+  overflow: hidden;
+  white-space: nowrap;
 }
 
 .control-log {
