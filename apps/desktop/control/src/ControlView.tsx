@@ -2,6 +2,7 @@ import { ArrowLeftIcon, GearIcon, LockClosedIcon, LockOpen1Icon, PlayIcon, StopI
 import { Badge, Box, Button, Callout, Card, Flex, Heading, SegmentedControl, Separator, Text, TextField } from '@radix-ui/themes'
 import { useEffect, useRef, useState } from 'react'
 import type { ControlState, SwitchRequest } from '../../src/types.ts'
+import logoUrl from '../../../web/public/favicon.svg'
 
 const control = window.offeeControl
 
@@ -96,7 +97,8 @@ export const ControlView = () => {
   if (state.view === 'offee') {
     return (
       <Flex align="center" justify="between" gap="3" className="control-toolbar">
-        <Flex align="center" gap="3">
+        <Flex align="center" gap="2">
+          <img src={logoUrl} width={24} height={24} alt="" />
           <Text size="3" weight="bold">
             Offee
           </Text>
