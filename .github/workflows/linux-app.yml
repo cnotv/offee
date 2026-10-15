@@ -29,6 +29,8 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @offee/desktop build
+        env:
+          OFFEE_BUILD_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
       - run: pnpm --filter @offee/desktop package:linux
 
       # apt resolves the package's dependencies the way it would on someone's machine.

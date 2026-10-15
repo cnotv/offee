@@ -20,6 +20,8 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @offee/desktop build
+        env:
+          OFFEE_BUILD_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
       - run: pnpm --filter @offee/desktop package:mac
 
       # macOS's own Bash is 3.2, older than the one on Linux runners; the app runs the launcher

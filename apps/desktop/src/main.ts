@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process'
-import { appendFileSync, existsSync, mkdirSync } from 'node:fs'
-import { homedir } from 'node:os'
+import { accessSync, appendFileSync, constants, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { mkdtemp } from 'node:fs/promises'
+import { homedir, tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, session, shell, Tray } from 'electron'
@@ -10,7 +11,9 @@ import { approvalPromptFor, parsePendingReply, parseStatusReply, requestsToAsk }
 import { runLauncher } from './launcher.ts'
 import { describeFailure } from './setup-messages.ts'
 import { trayEntries } from './tray-menu.ts'
-import type { ControlState, PendingRequest, SwitchRequest, TrayAction, TrayEntry } from './types.ts'
+import type { AvailableUpdate, ControlState, InstallKind, PendingRequest, SwitchRequest, TrayAction, TrayEntry, UpdateState } from './types.ts'
+import { downloadVerified, fetchRelease, installDebianPackage, replaceMacApp } from './update-install.ts'
+import { assetNameFor, installKindFor, macAppBundle, parseRelease, releasePageFor, releaseTagFor, startCommandFor, updateFor } from './updates.ts'
 import { isAllowedRequestUrl, isOffeeUrl, isPermissionAllowed, offeeOrigin, pathWithHomebrew, unreachableProxy } from './window-policy.ts'
 
 const distDirectory = dirname(fileURLToPath(import.meta.url))
@@ -21,6 +24,11 @@ const pollMilliseconds = 3000
 const logDirectory = app.getPath('logs')
 const logFile = join(logDirectory, 'offee.log')
 const smokeTest = process.env.OFFEE_SMOKE_TEST === '1'
+
+// Set by scripts/build.ts.
+declare const OFFEE_BUILD_COMMIT: string
+const buildCommit = OFFEE_BUILD_COMMIT
+const builtCommitFile = join(stateDirectory, 'built-commit')
 
 const switchRequestSchema = z.discriminatedUnion('mode', [
   z.object({ mode: z.literal('sealed') }),
@@ -40,8 +48,9 @@ const runtime: {
   polling: boolean
   errorShown: boolean
   longRunningLauncher: AbortController | null
+  availableUpdate: AvailableUpdate | null
 } = {
-  state: { phase: 'checking', gateway: null, hasAnthropicKey: false, message: null },
+  state: { phase: 'checking', gateway: null, hasAnthropicKey: false, message: null, buildCommit, update: { status: 'idle' } },
   tray: null,
   offeeWindow: null,
   controlWindow: null,
@@ -50,6 +59,7 @@ const runtime: {
   polling: false,
   errorShown: false,
   longRunningLauncher: null,
+  availableUpdate: null,
 }
 
 // Everything the launcher prints and every error lands here, so a failure on someone's computer
@@ -84,6 +94,8 @@ process.on('unhandledRejection', reportUnexpectedError)
 
 const isSetUp = (): boolean => existsSync(join(stateDirectory, 'setup-complete'))
 const hasAnthropicKey = (): boolean => existsSync(join(stateDirectory, 'keys', 'anthropic'))
+const readBuiltCommit = (): string | null => (existsSync(builtCommitFile) ? readFileSync(builtCommitFile, 'utf8').trim() : null)
+const recordBuiltCommit = (): void => writeFileSync(builtCommitFile, `${buildCommit}\n`)
 
 const sendLog = (text: string): void => {
   writeLog(text)
@@ -267,6 +279,7 @@ const runSetup = async (): Promise<void> => {
   const result = await cancellableLauncher(['setup'])
   if (result.cancelled) return
   if (result.exitCode === 0) {
+    recordBuiltCommit()
     updateState({ phase: 'running', message: null })
     openOffeeWindow()
   } else {
@@ -277,9 +290,10 @@ const runSetup = async (): Promise<void> => {
 
 const start = async (): Promise<void> => {
   updateState({ phase: 'starting', message: null })
-  const result = await cancellableLauncher(['start'])
+  const result = await cancellableLauncher([startCommandFor(readBuiltCommit(), buildCommit, app.isPackaged)])
   if (result.cancelled) return
   if (result.exitCode === 0) {
+    recordBuiltCommit()
     updateState({ phase: 'running', message: null })
     openOffeeWindow()
   } else {
@@ -359,6 +373,93 @@ const saveAnthropicKey = async (key: string): Promise<void> => {
   await pollGateway()
 }
 
+const isWritable = (path: string): boolean => {
+  try {
+    accessSync(path, constants.W_OK)
+    return true
+  } catch {
+    return false
+  }
+}
+
+const installKind = (): InstallKind =>
+  installKindFor({ packaged: app.isPackaged, platform: process.platform, execPath: process.execPath, applicationsWritable: isWritable('/Applications') })
+
+const setUpdate = (update: UpdateState): void => updateState({ update })
+
+const errorMessage = (error: unknown): string => (error instanceof Error ? error.message : String(error))
+
+// Asked for by a click, never in the background; the request goes from this computer to GitHub
+// and is written to the log.
+const checkForUpdate = async (): Promise<void> => {
+  const tag = releaseTagFor(process.platform)
+  const kind = installKind()
+  if (tag === null || kind === 'source') {
+    setUpdate({ status: 'notice', message: 'This copy runs from source: update it with git pull, then offee update.' })
+    return
+  }
+  setUpdate({ status: 'checking' })
+  writeLog(`${new Date().toISOString()} update: asking GitHub for the ${tag} release`)
+  try {
+    const release = parseRelease(await fetchRelease(tag))
+    if (release === null) throw new Error('GitHub sent a release Offee cannot read')
+    runtime.availableUpdate = updateFor(buildCommit, release, assetNameFor(process.platform, process.arch, kind))
+    setUpdate(runtime.availableUpdate === null ? { status: 'current' } : { status: 'available', commit: runtime.availableUpdate.commit })
+  } catch (error) {
+    writeLog(`${new Date().toISOString()} update: check failed: ${describeError(error)}`)
+    setUpdate({ status: 'notice', message: `Could not check for updates: ${errorMessage(error)}` })
+  }
+}
+
+const confirmInstall = async (): Promise<boolean> => {
+  const { response } = await dialog.showMessageBox({
+    type: 'info',
+    title: 'Update Offee',
+    message: 'Install the newest Offee?',
+    detail: 'Offee stops and the app restarts. The first start afterwards rebuilds the containers, which takes a few minutes. Your documents and settings stay.',
+    buttons: ['Cancel', 'Install'],
+    defaultId: 1,
+    cancelId: 0,
+  })
+  return response === 1
+}
+
+const relaunch = (): void => {
+  app.relaunch()
+  app.quit()
+}
+
+const installUpdate = async (): Promise<void> => {
+  const update = runtime.availableUpdate
+  const tag = releaseTagFor(process.platform)
+  if (update === null || tag === null || ['setting-up', 'starting', 'stopping'].includes(runtime.state.phase)) return
+  const kind = installKind()
+  if (kind === 'release-page' || update.asset === null) {
+    await shell.openExternal(releasePageFor(tag))
+    return
+  }
+  if (!(await confirmInstall())) return
+  setUpdate({ status: 'installing' })
+  try {
+    const directory = await mkdtemp(join(tmpdir(), 'offee-update-'))
+    writeLog(`${new Date().toISOString()} update: downloading ${update.asset.url}`)
+    const file = await downloadVerified(update.asset, directory)
+    writeLog(`${new Date().toISOString()} update: ${update.asset.name} matches ${update.asset.digest}`)
+    if (kind === 'open-disk-image') {
+      await shell.openPath(file)
+      setUpdate({ status: 'notice', message: 'Drag Offee to Applications, replacing the old one, then open it again.' })
+      return
+    }
+    if (kind === 'replace-app') await replaceMacApp(file, directory, macAppBundle)
+    if (kind === 'deb') await installDebianPackage(file)
+    writeLog(`${new Date().toISOString()} update: installed ${update.commit}, restarting`)
+    relaunch()
+  } catch (error) {
+    writeLog(`${new Date().toISOString()} update: install failed: ${describeError(error)}`)
+    setUpdate({ status: 'notice', message: `The update was not installed: ${errorMessage(error)}` })
+  }
+}
+
 const performTrayAction = async (action: TrayAction): Promise<void> => {
   if (action.kind === 'open-offee') openOffeeWindow()
   if (action.kind === 'open-control') openControlWindow()
@@ -370,6 +471,10 @@ const performTrayAction = async (action: TrayAction): Promise<void> => {
   if (action.kind === 'start') await start()
   if (action.kind === 'stop') await stop()
   if (action.kind === 'show-log') shell.showItemInFolder(logFile)
+  if (action.kind === 'check-update') {
+    openControlWindow()
+    await checkForUpdate()
+  }
   if (action.kind === 'quit') app.quit()
 }
 
@@ -392,6 +497,8 @@ const registerControlHandlers = (): void => {
   handle('offee:save-key', async (_event, payload) => saveAnthropicKey(anthropicKeySchema.parse(payload)))
   handle('offee:selftest', runSelftest)
   handle('offee:open-offee', async () => openOffeeWindow())
+  handle('offee:check-update', checkForUpdate)
+  handle('offee:install-update', installUpdate)
 }
 
 const lockDownWebContents = (contents: WebContents): void => {

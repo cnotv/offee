@@ -36,6 +36,18 @@ const requestFor = (value: string): SwitchRequest => {
 
 const maximumLogLength = 60_000
 
+const shortCommit = (commit: string): string => commit.slice(0, 7)
+
+const updateText = (state: ControlState): string => {
+  const build = `Build ${shortCommit(state.buildCommit)}`
+  if (state.update.status === 'checking') return `${build}. Asking GitHub for the newest build…`
+  if (state.update.status === 'current') return `${build} is the newest.`
+  if (state.update.status === 'available') return `${build}. Build ${shortCommit(state.update.commit)} is ready to install.`
+  if (state.update.status === 'installing') return 'Downloading and checking the new build…'
+  if (state.update.status === 'notice') return state.update.message
+  return `${build}. Checked only when you ask, from this computer; nothing comes from Offee itself.`
+}
+
 /** The host-side settings: setup, start and stop, the switch, and the key for Claude. */
 export const ControlView = () => {
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null)
@@ -182,6 +194,32 @@ export const ControlView = () => {
           <PlayIcon /> Start Offee
         </Button>
       )}
+
+      <Card size="2">
+        <Flex justify="between" align="center" gap="3" wrap="wrap">
+          <Flex direction="column" gap="1" flexGrow="1" flexBasis="16rem">
+            <Text size="2" weight="medium">
+              Updates
+            </Text>
+            <Text size="1" color="gray">
+              {updateText(state)}
+            </Text>
+          </Flex>
+          {state.update.status === 'available' ? (
+            <Button disabled={working} loading={busy} onClick={() => run(control.installUpdate)}>
+              Install update
+            </Button>
+          ) : (
+            <Button
+              variant="soft"
+              loading={state.update.status === 'checking' || state.update.status === 'installing'}
+              onClick={() => run(control.checkForUpdate)}
+            >
+              Check for updates
+            </Button>
+          )}
+        </Flex>
+      </Card>
 
       <Flex direction="column" gap="1">
         <Text size="2" weight="medium">
