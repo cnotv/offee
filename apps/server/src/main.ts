@@ -14,6 +14,7 @@ import { createDocumentStore } from './store/document-store.ts'
 import { createFileStore } from './store/file-store.ts'
 import { createPersonaStore, createProfileStore } from './store/profile-store.ts'
 import { createRunStore } from './store/run-store.ts'
+import { createStoredData } from './store/stored-data.ts'
 import { createTranscriber } from './transcription/transcriber.ts'
 import { createWorkflows } from './workflows/workflows.ts'
 
@@ -67,6 +68,7 @@ const app = createApp({
   documents,
   runs,
   files,
+  storedData: createStoredData(database),
   workflows,
   localModel,
   transcriber,

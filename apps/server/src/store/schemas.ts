@@ -50,6 +50,12 @@ export const outboundRecordSchema = z.object({
 
 export const workflowKindSchema = z.enum(['chat', 'reply', 'translate', 'review', 'transcribe', 'form', 'profile'])
 
+export const storedItemKindSchema = z.enum(['profile', 'persona', 'document', 'file', 'run'])
+
+export const storedItemDeletionSchema = z.object({
+  items: z.array(z.object({ kind: storedItemKindSchema, id: z.string().min(1).max(100) })).min(1).max(10_000),
+})
+
 export const workflowContextSchema = z.object({
   profileId: z.string().nullable(),
   personaId: z.string().nullable(),

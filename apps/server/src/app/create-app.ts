@@ -11,6 +11,7 @@ import type { DocumentStore } from '../store/document-store.ts'
 import type { FileStore } from '../store/file-store.ts'
 import type { PersonaStore, ProfileStore } from '../store/profile-store.ts'
 import type { RunStore } from '../store/run-store.ts'
+import type { StoredData } from '../store/stored-data.ts'
 import {
   chatRequestSchema,
   documentAssignmentSchema,
@@ -19,6 +20,7 @@ import {
   profileInputSchema,
   replyRequestSchema,
   reviewRequestSchema,
+  storedItemDeletionSchema,
   translateRequestSchema,
 } from '../store/schemas.ts'
 import type { Transcriber } from '../transcription/transcriber.ts'
@@ -30,6 +32,7 @@ export type AppDependencies = {
   documents: DocumentStore
   runs: RunStore
   files: FileStore
+  storedData: StoredData
   workflows: Workflows
   localModel: LocalModel
   transcriber: Transcriber
@@ -62,7 +65,7 @@ const describeError = (error: unknown): string => (error instanceof Error ? erro
 
 /**
  * Builds Offee's HTTP API: the Host and origin guard in front of every route, then profiles,
- * personas, documents, the workflows, files and the run log.
+ * personas, documents, the workflows, files, the run log and everything stored at once.
  * @param dependencies Stores, workflows, model clients, gateway status reader and settings.
  * @returns The Hono app.
  */
@@ -228,6 +231,16 @@ export const createApp = (dependencies: AppDependencies): Hono => {
   app.get('/api/runs/:id/conversation', (context) => {
     const runs = dependencies.runs.conversationOf(context.req.param('id'))
     return runs === undefined ? context.notFound() : context.json(runs)
+  })
+
+  app.get('/api/stored-data', (context) => context.json(dependencies.storedData.list()))
+  app.post('/api/stored-data/delete', jsonLimit, async (context) => {
+    const input = await readJson(context, storedItemDeletionSchema)
+    return input.ok ? context.json({ removed: dependencies.storedData.removeMany(input.data.items) }) : context.json({ error: input.error }, 400)
+  })
+  app.delete('/api/stored-data', (context) => {
+    dependencies.storedData.removeAll()
+    return context.body(null, 204)
   })
 
   // Anything else under /api is a mistake, not a page of the web app.
