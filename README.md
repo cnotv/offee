@@ -158,7 +158,7 @@ the Mac rather than from Offee. **Install update** downloads it, refuses it unle
 matches the one GitHub lists, replaces `/Applications/Offee.app` and restarts; the first start
 afterwards rebuilds the containers. An app that runs from elsewhere opens the disk image for
 you to drag over instead. The checksum proves the file is the one GitHub serves, not who built
-it: the app is not notarized.
+it: the update's signature is checked to be intact, not to be Offee's own.
 
 The bar and the settings are one page and Offee is another, in two views of the one window,
 never one inside the other. The view that shows Offee is a locked-down browser: no Node.js,
