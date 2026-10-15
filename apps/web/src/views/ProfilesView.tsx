@@ -5,6 +5,7 @@ import type { Profile, ProfileInput, ProfileReading } from '@offee/contracts'
 import { ErrorCallout } from '@/components/ErrorCallout'
 import { FilePickerButton } from '@/components/FilePickerButton'
 import { RunningOperations } from '@/components/Operations'
+import { SamplePreviewButton } from '@/components/SamplePreviewButton'
 import { ModelBadge } from '@/components/WorkflowResultCard'
 import { useAction } from '@/hooks/useAction'
 import { useDirectory } from '@/hooks/useDirectory'
@@ -122,6 +123,7 @@ const ProfileDialog = ({ profile, open, onOpenChange, onSaved }: ProfileDialogPr
             >
               <FileIcon /> Try the sample scan
             </Button>
+            <SamplePreviewButton sample={sampleFiles.scan} />
           </Flex>
           <Text size="1" color="gray">
             An ID, a CV or a scan: the local model on this machine fills in what it says. That takes{' '}

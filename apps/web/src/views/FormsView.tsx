@@ -5,6 +5,7 @@ import { ContextPicker } from '@/components/ContextPicker'
 import { ErrorCallout } from '@/components/ErrorCallout'
 import { FilePickerButton } from '@/components/FilePickerButton'
 import { RunningOperations } from '@/components/Operations'
+import { SamplePreviewButton } from '@/components/SamplePreviewButton'
 import { ModelBadge } from '@/components/WorkflowResultCard'
 import { useDirectory } from '@/hooks/useDirectory'
 import { useOperations } from '@/hooks/useOperations'
@@ -113,6 +114,7 @@ export const FormsView = () => {
         >
           <FileIcon /> Try the sample form
         </Button>
+        <SamplePreviewButton sample={sampleFiles.form} />
       </Flex>
       <RunningOperations kinds={['form', 'form-save']} />
       <ErrorCallout error={page.error} />

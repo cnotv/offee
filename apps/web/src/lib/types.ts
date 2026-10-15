@@ -73,7 +73,13 @@ export type DurationHistory = Partial<Record<OperationKind, number[]>>
 export type Estimate = { basis: 'history' | 'typical'; label: string }
 
 /** A made up document shipped with the app to try a workflow with. */
-export type SampleFile = { path: string; name: string; type: string }
+export type SampleFile = {
+  path: string
+  name: string
+  type: string
+  /** A picture of the page, since the Mac window has no PDF viewer; null for a text file. */
+  pageImagePath: string | null
+}
 
 /** A page opened again from the run log, with what it holds. */
 export type Continuation = { [Page in WorkflowPage]: { page: Page; state: WorkflowPages[Page] } }[WorkflowPage]

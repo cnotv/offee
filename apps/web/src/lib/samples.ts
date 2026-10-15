@@ -2,9 +2,19 @@ import type { SampleFile } from './types'
 
 // Made up documents shipped with the app, so every slow operation can be tried without a file of one's own.
 export const sampleFiles = {
-  form: { path: '/samples/tenant-self-disclosure.pdf', name: 'tenant-self-disclosure.pdf', type: 'application/pdf' },
-  scan: { path: '/samples/personal-data-sheet-scan.pdf', name: 'personal-data-sheet-scan.pdf', type: 'application/pdf' },
-  document: { path: '/samples/office-handbook.txt', name: 'office-handbook.txt', type: 'text/plain' },
+  form: {
+    path: '/samples/tenant-self-disclosure.pdf',
+    name: 'tenant-self-disclosure.pdf',
+    type: 'application/pdf',
+    pageImagePath: '/samples/tenant-self-disclosure.png',
+  },
+  scan: {
+    path: '/samples/personal-data-sheet-scan.pdf',
+    name: 'personal-data-sheet-scan.pdf',
+    type: 'application/pdf',
+    pageImagePath: '/samples/personal-data-sheet-scan.png',
+  },
+  document: { path: '/samples/office-handbook.txt', name: 'office-handbook.txt', type: 'text/plain', pageImagePath: null },
 } satisfies Record<string, SampleFile>
 
 /**

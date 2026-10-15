@@ -216,3 +216,12 @@ body {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+
+.sample-page {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--gray-a5);
+  border-radius: var(--radius-2);
+  background: white;
+}
