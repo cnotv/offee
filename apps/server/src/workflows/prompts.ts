@@ -90,5 +90,6 @@ export const formTask =
 
 export const profileDetailsTask =
   'Pick out the details about the person this document describes. Copy each value exactly as the document writes it, and leave a field empty when the document does not give it. ' +
+  '"role" is their job title or occupation and "organization" their employer or company. ' +
   'Put every other personal detail it gives, such as date and place of birth, nationality, ID or passport number, tax number, employer or income, into "facts", one per line as "Label: value". ' +
   'Never invent anything. Answer with JSON only.'

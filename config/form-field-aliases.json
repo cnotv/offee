@@ -82,7 +82,13 @@
     "poste",
     "fonction",
     "cargo",
-    "puesto"
+    "puesto",
+    "occupation",
+    "profession",
+    "professione",
+    "occupazione",
+    "profesion",
+    "ocupacion"
   ],
   "street": [
     "street",

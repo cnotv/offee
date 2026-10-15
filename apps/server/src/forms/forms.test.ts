@@ -62,10 +62,10 @@ describe('matching fields to a profile', () => {
     expect(matchFieldToKey('Favourite colour', aliases)).toBeUndefined()
   })
 
-  it('leaves questions about birth to the model rather than answering them with today or the city', () => {
+  it('answers occupation from the role, and leaves questions about birth to the model rather than answering them with today or the city', () => {
     const shippedAliases = fieldAliasesSchema.parse(shippedAliasesFile)
-    const fields = ['Date of birth', 'Place of birth', 'Geburtsdatum', 'Place and date'].map((name) => ({ name, kind: 'text' as const, options: [] }))
-    expect(suggestFromProfile(fields, profile, shippedAliases, '15/10/2026').map((suggestion) => suggestion.value)).toEqual(['', '', '', 'London, 15/10/2026'])
+    const fields = ['Occupation', 'Date of birth', 'Place of birth', 'Geburtsdatum', 'Place and date'].map((name) => ({ name, kind: 'text' as const, options: [] }))
+    expect(suggestFromProfile(fields, profile, shippedAliases, '15/10/2026').map((suggestion) => suggestion.value)).toEqual(['Engineer', '', '', '', 'London, 15/10/2026'])
   })
 })
 
