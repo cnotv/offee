@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 440" role="img" aria-label="Your data sits in one database file, inside a volume, inside the VM's disk image, inside your user folder, on the Mac's disk. FileVault encrypts that disk, so everything is unreadable while the Mac is switched off. Offee adds no passphrase of its own yet. Between the window and the app, traffic stays on 127.0.0.1; a request to Claude, when allowed, goes over HTTPS with the key added by the gateway.">
+  <style>
+    svg { --paper: #f6f7f4; --zone: #eceff3; --card: #ffffff; --ink: #1a2438; --muted: #566173; --line: #b9c1cc; --green: #2e7a50; --green-soft: #e1f0e6; --amber: #a86a12; --amber-soft: #f7ecd6; --red: #ae4430; --red-soft: #f6e1dc; --blue: #24508f; --blue-soft: #e2eaf6; }
+    @media (prefers-color-scheme: dark) {
+      svg { --paper: #12171f; --zone: #19202b; --card: #212a37; --ink: #e6e9ee; --muted: #a3acba; --line: #46515f; --green: #5fbf88; --green-soft: #1b3326; --amber: #e0a548; --amber-soft: #382c17; --red: #ec7d63; --red-soft: #3b221c; --blue: #8cb4ee; --blue-soft: #1c2940; }
+    }
+    text { font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; fill: var(--ink); }
+    .title { font-size: 17px; font-weight: 650; }
+    .label { font-size: 15px; font-weight: 600; }
+    .note { font-size: 12.5px; fill: var(--muted); }
+    .small { font-size: 12px; font-weight: 600; }
+    .paper { fill: var(--paper); }
+    .zone { fill: var(--zone); }
+    .card { fill: var(--card); stroke: var(--line); stroke-width: 1.2; }
+    .flow { stroke: var(--ink); stroke-width: 1.6; fill: none; }
+    .blocked { stroke: var(--red); stroke-width: 1.6; stroke-dasharray: 5 4; fill: none; }
+    .arrowhead { fill: var(--ink); }
+  </style>
+  <rect class="paper" width="960" height="440" rx="20"/>
+
+  <!-- Nested layers, outermost first -->
+  <rect x="24" y="24" width="572" height="392" rx="20" fill="var(--green-soft)" stroke="var(--green)" stroke-width="2"/>
+  <rect x="44" y="40" width="20" height="16" rx="3" fill="var(--green)"/>
+  <path d="M48 41 V35 a6 6 0 0 1 12 0 V41" fill="none" stroke="var(--green)" stroke-width="2.2"/>
+  <text class="title" x="74" y="54">Your Mac's disk</text>
+  <text class="note" x="216" y="54" style="fill: var(--green); font-weight: 600">encrypted by FileVault</text>
+
+  <rect x="48" y="74" width="524" height="322" rx="16" class="card"/>
+  <text class="label" x="68" y="102">Your user folder</text>
+  <text class="note" x="198" y="102">~/.colima, only your account can open it</text>
+
+  <rect x="72" y="122" width="476" height="254" rx="14" fill="var(--zone)" stroke="var(--line)"/>
+  <text class="label" x="92" y="150">The VM's disk image</text>
+  <text class="note" x="262" y="150">about 15 GB, models included</text>
+
+  <rect x="96" y="170" width="428" height="186" rx="12" class="card"/>
+  <text class="label" x="116" y="198">offee-data volume</text>
+  <text class="note" x="268" y="198">only the app container mounts it</text>
+
+  <rect x="120" y="218" width="380" height="118" rx="12" fill="var(--blue-soft)" stroke="var(--blue)" stroke-width="1.4"/>
+  <ellipse cx="160" cy="250" rx="20" ry="7" fill="none" stroke="var(--blue)" stroke-width="1.6"/>
+  <path d="M140 250 V286 a20 7 0 0 0 40 0 V250" fill="none" stroke="var(--blue)" stroke-width="1.6"/>
+  <text class="label" x="198" y="256">offee.sqlite</text>
+  <text class="note" x="198" y="278">profiles, documents, files,</text>
+  <text class="note" x="198" y="296">signing keys, run log</text>
+  <text class="note" x="198" y="314">no passphrase of its own yet</text>
+
+  <!-- Notes on the right -->
+  <rect x="624" y="24" width="312" height="88" rx="14" fill="var(--green-soft)" stroke="var(--green)" stroke-width="1.4"/>
+  <text class="label" x="644" y="54">Mac switched off</text>
+  <text class="note" x="644" y="76">FileVault locks the whole disk:</text>
+  <text class="note" x="644" y="94">none of these layers can be read</text>
+
+  <rect x="624" y="128" width="312" height="88" rx="14" fill="var(--amber-soft)" stroke="var(--amber)" stroke-width="1.4" stroke-dasharray="6 4"/>
+  <text class="label" x="644" y="158">Offee's own lock: not yet</text>
+  <text class="note" x="644" y="180">A volume that opens only with your</text>
+  <text class="note" x="644" y="198">passphrase is planned (issue #3).</text>
+
+  <rect x="624" y="232" width="312" height="80" rx="14" class="card"/>
+  <text class="label" x="644" y="262">Window to app</text>
+  <text class="note" x="644" y="284">stays on 127.0.0.1, never on a network</text>
+
+  <rect x="624" y="328" width="312" height="88" rx="14" class="card"/>
+  <text class="label" x="644" y="358">To Claude, if you allow it</text>
+  <text class="note" x="644" y="380">HTTPS; the gateway adds the API key,</text>
+  <text class="note" x="644" y="398">kept on the Mac in ~/.offee/keys</text>
+</svg>

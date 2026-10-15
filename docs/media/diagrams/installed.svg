@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 460" role="img" aria-label="On your Mac, setup installs Colima and the Docker command line tools with Homebrew, next to the Offee app. Inside the VM it keeps about 11 GB: the Gemma 4 E4B chat model 8.0 GB, the llama.cpp server 1.2 GB, whisper.cpp with ffmpeg 0.7 GB, the Whisper speech model 0.6 GB, the Offee app with OCR 0.5 GB and the edge web server 0.1 GB. All of it is downloaded once, during setup.">
+  <style>
+    svg { --paper: #f6f7f4; --zone: #eceff3; --card: #ffffff; --ink: #1a2438; --muted: #566173; --line: #b9c1cc; --green: #2e7a50; --green-soft: #e1f0e6; --amber: #a86a12; --amber-soft: #f7ecd6; --red: #ae4430; --red-soft: #f6e1dc; --blue: #24508f; --blue-soft: #e2eaf6; --bar-model: #24508f; --bar-program: #a86a12; }
+    @media (prefers-color-scheme: dark) {
+      svg { --paper: #12171f; --zone: #19202b; --card: #212a37; --ink: #e6e9ee; --muted: #a3acba; --line: #46515f; --green: #5fbf88; --green-soft: #1b3326; --amber: #e0a548; --amber-soft: #382c17; --red: #ec7d63; --red-soft: #3b221c; --blue: #8cb4ee; --blue-soft: #1c2940; --bar-model: #5b8fd9; --bar-program: #b37a1f; }
+    }
+    text { font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; fill: var(--ink); }
+    .title { font-size: 17px; font-weight: 650; }
+    .label { font-size: 15px; font-weight: 600; }
+    .note { font-size: 12.5px; fill: var(--muted); }
+    .small { font-size: 12px; font-weight: 600; }
+    .paper { fill: var(--paper); }
+    .zone { fill: var(--zone); }
+    .card { fill: var(--card); stroke: var(--line); stroke-width: 1.2; }
+    .flow { stroke: var(--ink); stroke-width: 1.6; fill: none; }
+    .blocked { stroke: var(--red); stroke-width: 1.6; stroke-dasharray: 5 4; fill: none; }
+    .arrowhead { fill: var(--ink); }
+  </style>
+  <rect class="paper" width="960" height="460" rx="20"/>
+
+  <text class="title" x="32" y="52">On your Mac</text>
+  <text class="note" x="32" y="74">the app, and the tools setup adds with Homebrew</text>
+  <rect class="card" x="32" y="96" width="248" height="58" rx="12"/>
+  <text class="label" x="48" y="121">Offee</text><text class="note" x="48" y="141">the app, switch and setup</text>
+  <rect class="card" x="32" y="164" width="248" height="58" rx="12"/>
+  <text class="label" x="48" y="189">Colima</text><text class="note" x="48" y="209">creates and runs the VM</text>
+  <rect class="card" x="32" y="232" width="248" height="58" rx="12"/>
+  <text class="label" x="48" y="257">Docker CLI and Compose</text><text class="note" x="48" y="277">start the containers in the VM</text>
+  <rect x="32" y="300" width="248" height="58" rx="12" fill="none" stroke="var(--line)" stroke-dasharray="5 4"/>
+  <text class="label" x="48" y="325">krunkit</text><text class="note" x="48" y="345">only with --gpu, for the Mac's GPU</text>
+
+  <path d="M312 40 V420" stroke="var(--line)" stroke-width="1.2"/>
+
+  <text class="title" x="344" y="52">Inside the VM: about 11 GB</text>
+  <text class="note" x="344" y="74">downloaded once during setup; nothing is fetched while Offee runs</text>
+  <rect x="600" y="92" width="12" height="12" rx="3" fill="var(--bar-model)"/><text class="note" x="618" y="103">model</text>
+  <rect x="672" y="92" width="12" height="12" rx="3" fill="var(--bar-program)"/><text class="note" x="690" y="103">program</text>
+  <text class="label" x="584" y="143" text-anchor="end">Gemma 4 E4B chat model</text>
+  <path d="M600 128 H884.0 a4 4 0 0 1 4 4 V144 a4 4 0 0 1 -4 4 H600 Z" fill="var(--bar-model)"><title>Gemma 4 E4B chat model: 8.0 GB</title></path>
+  <text class="small" x="896.0" y="143" style="fill: var(--muted)">8.0 GB</text>
+  <text class="label" x="584" y="189" text-anchor="end">llama.cpp server</text>
+  <path d="M600 174 H639.2 a4 4 0 0 1 4 4 V190 a4 4 0 0 1 -4 4 H600 Z" fill="var(--bar-program)"><title>llama.cpp server: 1.2 GB</title></path>
+  <text class="small" x="651.2" y="189" style="fill: var(--muted)">1.2 GB</text>
+  <text class="label" x="584" y="235" text-anchor="end">whisper.cpp with ffmpeg</text>
+  <path d="M600 220 H621.2 a4 4 0 0 1 4 4 V236 a4 4 0 0 1 -4 4 H600 Z" fill="var(--bar-program)"><title>whisper.cpp with ffmpeg: 0.7 GB</title></path>
+  <text class="small" x="633.2" y="235" style="fill: var(--muted)">0.7 GB</text>
+  <text class="label" x="584" y="281" text-anchor="end">Whisper speech model</text>
+  <path d="M600 266 H617.6 a4 4 0 0 1 4 4 V282 a4 4 0 0 1 -4 4 H600 Z" fill="var(--bar-model)"><title>Whisper speech model: 0.6 GB</title></path>
+  <text class="small" x="629.6" y="281" style="fill: var(--muted)">0.6 GB</text>
+  <text class="label" x="584" y="327" text-anchor="end">Offee app, with OCR</text>
+  <path d="M600 312 H614.0 a4 4 0 0 1 4 4 V328 a4 4 0 0 1 -4 4 H600 Z" fill="var(--bar-program)"><title>Offee app, with OCR: 0.5 GB</title></path>
+  <text class="small" x="626.0" y="327" style="fill: var(--muted)">0.5 GB</text>
+  <text class="label" x="584" y="373" text-anchor="end">edge web server</text>
+  <path d="M600 358 H599.6 a4 4 0 0 1 4 4 V374 a4 4 0 0 1 -4 4 H600 Z" fill="var(--bar-program)"><title>edge web server: 0.1 GB</title></path>
+  <text class="small" x="611.6" y="373" style="fill: var(--muted)">0.1 GB</text>
+  <path d="M600 120 V408" stroke="var(--line)" stroke-width="1.2"/>
+</svg>

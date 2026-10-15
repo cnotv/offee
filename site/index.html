@@ -63,21 +63,11 @@
         </div>
 
         <section id="how">
-          <div class="prose">
-            <h2>How it works, in plain words</h2>
-            <p>
-              Think of a locked office inside your computer. Offee works in that office with its own copy of whatever you hand it through the door, and nothing
-              else. It cannot look at your other files, and the office has no phone line to the outside.
-            </p>
-            <p>
-              You hand it a document, say what you need, and it does the dull part: it puts your name and address in the right boxes of a form, writes a reply in
-              your tone, or turns a recorded meeting into a summary with who does what. You check what it suggests before anything is saved.
-            </p>
-            <p>
-              Sometimes a bigger online AI would do better. Then you hold the key, and Offee itself cannot open the door. A switch in your menu bar decides what may
-              leave:
-            </p>
-          </div>
+          <h2>How it works</h2>
+          <p class="prose">A locked office inside your computer: Offee works only on what you hand it, and has no line to the outside unless you open one.</p>
+          <figure class="diagram">
+            <div class="diagram-scroll"><img src="media/diagrams/how-it-fits.svg" width="960" height="500" alt="Your Mac holds the Offee window, the switch and your files. Offee runs inside a Linux VM in five containers on an internal network with no way out. The window reaches it only on 127.0.0.1, the VM shares no folder with the Mac, and the gateway is the only way to the internet, closed unless the switch on the Mac opens it."></div>
+          </figure>
 
           <fieldset class="switch">
             <legend>Try the switch</legend>
@@ -102,6 +92,17 @@
               <p><strong>Requests go out for a few minutes, then it seals itself again.</strong> Each one is still written down, so you can see later what left.</p>
             </div>
           </fieldset>
+        </section>
+
+        <section id="data">
+          <h2>Where your information lives</h2>
+          <figure class="diagram">
+            <div class="diagram-scroll"><img src="media/diagrams/your-information.svg" width="960" height="480" loading="lazy" alt="Files come in only when you upload them in the Offee window, and leave only when you download them. In between, the app keeps everything in one database inside the VM: profiles, personas, documents with their searchable text, files, and the run log. It never opens or saves into a folder on your Mac."></div>
+          </figure>
+          <figure class="diagram">
+            <div class="diagram-scroll"><img src="media/diagrams/encryption.svg" width="960" height="440" loading="lazy" alt="The database sits in a volume, inside the VM's disk image, inside your user folder, on the Mac's disk, which FileVault encrypts while the Mac is switched off. Offee has no passphrase lock of its own yet. Traffic between the window and the app stays on 127.0.0.1; a request to Claude, when you allow it, goes over HTTPS with the key added by the gateway."></div>
+            <figcaption>For now Offee relies on FileVault. A lock with your own passphrase is planned.</figcaption>
+          </figure>
         </section>
 
         <section id="why">
@@ -180,6 +181,12 @@
             <li>Choose Set up Offee. It downloads the AI (about 10 GB) once, then opens. From then on it needs no internet.</li>
             <li>Create a profile, or let Offee read one from a document, and try a form. Two made up documents to practise with are in <a href="https://github.com/cnotv/offee/tree/main/docs/demo">the demo folder</a>.</li>
           </ol>
+          <details class="extra">
+            <summary>What gets installed, and how much space it takes</summary>
+            <figure class="diagram">
+              <div class="diagram-scroll"><img src="media/diagrams/installed.svg" width="960" height="460" loading="lazy" alt="On your Mac: the Offee app, plus Colima and the Docker command line tools that setup adds with Homebrew, and krunkit only with the GPU option. Inside the VM about 11 GB: the Gemma 4 E4B chat model 8.0 GB, the llama.cpp server 1.2 GB, whisper.cpp with ffmpeg 0.7 GB, the Whisper speech model 0.6 GB, the Offee app with OCR 0.5 GB and the edge web server 0.1 GB."></div>
+            </figure>
+          </details>
           <p class="prose small">Prefer the terminal, or on Linux? The <a href="https://github.com/cnotv/offee#from-the-terminal">README</a> has the commands.</p>
         </section>
       </main>

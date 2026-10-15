@@ -1,0 +1,106 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 500" role="img" aria-label="Your Mac holds the Offee window, the switch and your files. Offee runs inside a Linux VM on the Mac, in five containers on an internal network with no way out. The window reaches the VM only on 127.0.0.1; the gateway is the only way to the internet and stays closed unless the switch on the Mac opens it; the VM shares no folder with the Mac.">
+  <style>
+    svg { --paper: #f6f7f4; --zone: #eceff3; --card: #ffffff; --ink: #1a2438; --muted: #566173; --line: #b9c1cc; --green: #2e7a50; --green-soft: #e1f0e6; --amber: #a86a12; --amber-soft: #f7ecd6; --red: #ae4430; --red-soft: #f6e1dc; --blue: #24508f; --blue-soft: #e2eaf6; }
+    @media (prefers-color-scheme: dark) {
+      svg { --paper: #12171f; --zone: #19202b; --card: #212a37; --ink: #e6e9ee; --muted: #a3acba; --line: #46515f; --green: #5fbf88; --green-soft: #1b3326; --amber: #e0a548; --amber-soft: #382c17; --red: #ec7d63; --red-soft: #3b221c; --blue: #8cb4ee; --blue-soft: #1c2940; }
+    }
+    text { font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; fill: var(--ink); }
+    .title { font-size: 17px; font-weight: 650; }
+    .label { font-size: 15px; font-weight: 600; }
+    .note { font-size: 12.5px; fill: var(--muted); }
+    .small { font-size: 12px; font-weight: 600; }
+    .paper { fill: var(--paper); }
+    .zone { fill: var(--zone); }
+    .card { fill: var(--card); stroke: var(--line); stroke-width: 1.2; }
+    .flow { stroke: var(--ink); stroke-width: 1.6; fill: none; }
+    .blocked { stroke: var(--red); stroke-width: 1.6; stroke-dasharray: 5 4; fill: none; }
+    .arrowhead { fill: var(--ink); }
+  </style>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="arrowhead"/></marker>
+  </defs>
+  <rect class="paper" width="960" height="500" rx="20"/>
+
+  <!-- The Mac -->
+  <rect class="zone" x="16" y="16" width="770" height="468" rx="18"/>
+  <rect x="34" y="32" width="26" height="17" rx="3" fill="none" stroke="var(--ink)" stroke-width="1.8"/>
+  <path d="M29 53 H65" stroke="var(--ink)" stroke-width="2.4" stroke-linecap="round"/>
+  <text class="title" x="74" y="48">Your Mac</text>
+
+  <rect class="card" x="34" y="121" width="180" height="70" rx="12"/>
+  <text class="label" x="50" y="149">Offee window</text>
+  <text class="note" x="50" y="171">talks to 127.0.0.1 only</text>
+
+  <rect class="card" x="34" y="236" width="180" height="80" rx="12"/>
+  <text class="label" x="50" y="264">Your files</text>
+  <text class="note" x="50" y="286">Documents, Desktop,</text>
+  <text class="note" x="50" y="302">everything else</text>
+
+  <rect class="card" x="34" y="352" width="180" height="112" rx="12"/>
+  <text class="label" x="50" y="380">The switch</text>
+  <text class="note" x="50" y="400">menu bar, Mac only</text>
+  <rect x="50" y="414" width="52" height="24" rx="12" fill="var(--green)"/>
+  <text class="small" x="76" y="430" text-anchor="middle" style="fill: var(--paper)">Sealed</text>
+  <rect x="106" y="414" width="40" height="24" rx="12" fill="var(--amber-soft)" stroke="var(--amber)"/>
+  <text class="small" x="126" y="430" text-anchor="middle" style="fill: var(--amber)">Ask</text>
+  <rect x="150" y="414" width="48" height="24" rx="12" fill="var(--red-soft)" stroke="var(--red)"/>
+  <text class="small" x="174" y="430" text-anchor="middle" style="fill: var(--red)">Open</text>
+
+  <!-- The VM -->
+  <rect x="246" y="64" width="524" height="404" rx="16" fill="var(--card)" stroke="var(--line)" stroke-width="1.4"/>
+  <text class="title" x="266" y="94">Offee VM</text>
+  <text class="note" x="350" y="94">a Linux machine inside your Mac</text>
+  <rect x="262" y="110" width="492" height="300" rx="12" fill="none" stroke="var(--line)" stroke-width="1.4" stroke-dasharray="6 5"/>
+  <text class="note" x="278" y="398">internal network: no address outside the VM</text>
+
+  <rect x="278" y="126" width="200" height="60" rx="10" fill="var(--zone)" stroke="var(--line)"/>
+  <text class="label" x="294" y="152">edge</text>
+  <text class="note" x="294" y="172">web server, the only door</text>
+
+  <rect x="278" y="222" width="200" height="86" rx="10" fill="var(--blue-soft)" stroke="var(--blue)" stroke-width="1.4"/>
+  <text class="label" x="294" y="248">app</text>
+  <text class="note" x="294" y="268">screens, workflows,</text>
+  <text class="note" x="294" y="284">your data, OCR</text>
+
+  <rect x="538" y="126" width="200" height="60" rx="10" fill="var(--zone)" stroke="var(--line)"/>
+  <text class="label" x="554" y="152">inference</text>
+  <text class="note" x="554" y="172">llama.cpp, the chat model</text>
+
+  <rect x="538" y="222" width="200" height="60" rx="10" fill="var(--zone)" stroke="var(--line)"/>
+  <text class="label" x="554" y="248">transcription</text>
+  <text class="note" x="554" y="268">whisper.cpp, recordings</text>
+
+  <rect x="538" y="316" width="200" height="60" rx="10" fill="var(--amber-soft)" stroke="var(--amber)" stroke-width="1.4"/>
+  <text class="label" x="554" y="342">gateway</text>
+  <text class="note" x="554" y="362">adds the API key itself</text>
+
+  <!-- Flows -->
+  <path class="flow" d="M214 156 H276" marker-end="url(#arrow)"/>
+  <path class="flow" d="M378 186 V220" marker-end="url(#arrow)"/>
+  <path class="flow" d="M478 238 H508 V156 H536" marker-end="url(#arrow)"/>
+  <text class="note" x="486" y="208">asks</text>
+  <path class="flow" d="M478 252 H536" marker-end="url(#arrow)"/>
+  <path class="flow" d="M478 290 H508 V346 H536" marker-end="url(#arrow)"/>
+  <text class="note" x="398" y="330">remote request</text>
+
+  <!-- The switch controls the gateway from outside the VM -->
+  <path d="M214 440 H628 V378" fill="none" stroke="var(--amber)" stroke-width="1.6" stroke-dasharray="2 4" stroke-linecap="round" marker-end="url(#arrow)"/>
+  <text class="note" x="278" y="458" style="fill: var(--amber)">only the Mac sets the switch; nothing in the VM can</text>
+
+  <!-- No shared folder -->
+  <path class="blocked" d="M214 276 H236"/>
+  <circle cx="240" cy="276" r="10" fill="var(--red-soft)" stroke="var(--red)"/>
+  <path d="M235 271 L245 281 M245 271 L235 281" stroke="var(--red)" stroke-width="2"/>
+
+  <!-- The only way out -->
+  <path class="flow" d="M738 346 H776"/>
+  <rect x="776" y="334" width="10" height="24" rx="2" fill="var(--amber)"/>
+  <path class="flow" d="M786 346 H818" stroke-dasharray="5 4" marker-end="url(#arrow)"/>
+  <text class="note" x="800" y="414">closed until you open it</text>
+
+  <rect x="820" y="300" width="124" height="92" rx="14" fill="var(--zone)" stroke="var(--line)"/>
+  <text class="label" x="836" y="330">Internet</text>
+  <text class="note" x="836" y="352">Claude, only</text>
+  <text class="note" x="836" y="368">when you allow</text>
+  <text class="note" x="836" y="384">each request</text>
+</svg>
