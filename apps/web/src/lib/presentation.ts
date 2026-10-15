@@ -31,6 +31,7 @@ const workflowNames: Record<RunSummary['workflow'], string> = {
   review: 'Review',
   transcribe: 'Transcript',
   form: 'Form',
+  profile: 'Profile from a document',
 }
 
 /**

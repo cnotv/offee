@@ -73,6 +73,26 @@ export const formInspectionSchema = z.object({
   model: modelUsedSchema.nullable(),
 })
 
+export const profileReadingSchema = z.object({
+  runId: z.string(),
+  fileName: z.string(),
+  details: z.object({
+    firstName: z.string(),
+    lastName: z.string(),
+    role: z.string(),
+    organization: z.string(),
+    email: z.string(),
+    phone: z.string(),
+    street: z.string(),
+    postalCode: z.string(),
+    city: z.string(),
+    country: z.string(),
+    languages: z.array(z.string()),
+    facts: z.string(),
+  }),
+  model: modelUsedSchema,
+})
+
 export const formFillResultSchema = z.object({ runId: z.string(), outputFileId: z.string(), signed: z.boolean() })
 
 export const appStatusSchema = z.object({
@@ -91,7 +111,7 @@ export const outboundRecordSchema = z.object({
 
 export const runSummarySchema = z.object({
   id: z.string(),
-  workflow: z.enum(['chat', 'reply', 'translate', 'review', 'transcribe', 'form']),
+  workflow: z.enum(['chat', 'reply', 'translate', 'review', 'transcribe', 'form', 'profile']),
   title: z.string(),
   model: modelUsedSchema.nullable(),
   leftMachine: z.boolean(),

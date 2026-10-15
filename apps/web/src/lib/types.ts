@@ -12,6 +12,7 @@ import type {
   PersonaInput,
   Profile,
   ProfileInput,
+  ProfileReading,
   ReplyRequest,
   ReviewRequest,
   ReviewTemplate,
@@ -70,6 +71,7 @@ export type OffeeApi = {
   createProfile: (input: ProfileInput) => Promise<Profile>
   updateProfile: (id: string, input: ProfileInput) => Promise<Profile>
   deleteProfile: (id: string) => Promise<void>
+  readProfileDocument: (file: File) => Promise<ProfileReading>
   personas: () => Promise<Persona[]>
   createPersona: (input: PersonaInput) => Promise<Persona>
   updatePersona: (id: string, input: PersonaInput) => Promise<Persona>

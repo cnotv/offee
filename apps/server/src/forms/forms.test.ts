@@ -2,7 +2,8 @@ import { PDFDocument } from 'pdf-lib'
 import { describe, expect, it } from 'vitest'
 import type { Profile } from '@offee/contracts'
 import { createSigningCertificate } from './certificate.ts'
-import { matchFieldToKey, normalizeFieldName, suggestFromProfile } from './match-fields.ts'
+import shippedAliasesFile from '../../../../config/form-field-aliases.json' with { type: 'json' }
+import { fieldAliasesSchema, matchFieldToKey, normalizeFieldName, suggestFromProfile } from './match-fields.ts'
 import { fillForm, readFormFields } from './pdf-form.ts'
 
 const aliases = {
@@ -59,6 +60,12 @@ describe('matching fields to a profile', () => {
     expect(matchFieldToKey('Company name', aliases)).toBe('organization')
     expect(matchFieldToKey('Ort, Datum', aliases)).toBe('date')
     expect(matchFieldToKey('Favourite colour', aliases)).toBeUndefined()
+  })
+
+  it('answers occupation from the role, and leaves questions about birth to the model rather than answering them with today or the city', () => {
+    const shippedAliases = fieldAliasesSchema.parse(shippedAliasesFile)
+    const fields = ['Occupation', 'Date of birth', 'Place of birth', 'Geburtsdatum', 'Place and date'].map((name) => ({ name, kind: 'text' as const, options: [] }))
+    expect(suggestFromProfile(fields, profile, shippedAliases, '15/10/2026').map((suggestion) => suggestion.value)).toEqual(['Engineer', '', '', '', 'London, 15/10/2026'])
   })
 })
 

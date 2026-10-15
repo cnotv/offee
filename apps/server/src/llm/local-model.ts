@@ -36,7 +36,8 @@ export const createLocalModel = (baseUrl: string, fetchFunction: typeof fetch = 
       body: JSON.stringify({
         messages: request.messages,
         max_tokens: request.maxTokens,
-        temperature: 0.3,
+        // An answer that must fit a schema is data read off a document: the likeliest reading, every time.
+        temperature: request.jsonSchema === undefined ? 0.3 : 0,
         ...(request.jsonSchema === undefined
           ? {}
           : { response_format: { type: 'json_schema', json_schema: { name: 'answer', schema: request.jsonSchema } } }),

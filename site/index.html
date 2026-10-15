@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Offee: a paperwork helper that keeps your documents on your Mac</title>
+    <meta name="description" content="Offee fills forms, drafts replies, translates and sums up meetings with an AI that runs on your own computer. Your documents never leave it unless you say so.">
+    <link rel="canonical" href="https://cnotv.github.io/offee/">
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="style.css">
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="Offee: a paperwork helper that keeps your documents on your Mac">
+    <meta property="og:description" content="Fill forms, draft replies, translate and sum up meetings with an AI that runs on your own computer.">
+    <meta property="og:url" content="https://cnotv.github.io/offee/">
+    <meta property="og:image" content="https://cnotv.github.io/offee/og-image.png">
+    <meta property="og:image:alt" content="Offee filling a tenant form from a profile">
+    <meta name="twitter:card" content="summary_large_image">
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "Offee",
+        "description": "An office assistant that runs on your own machine, sealed off from it: fills forms, drafts replies, translates and writes reviews with local models.",
+        "applicationCategory": "BusinessApplication",
+        "operatingSystem": "macOS 13 or later on Apple Silicon",
+        "url": "https://cnotv.github.io/offee/",
+        "downloadUrl": "https://github.com/cnotv/offee/releases/tag/mac-preview",
+        "codeRepository": "https://github.com/cnotv/offee"
+      }
+    </script>
+  </head>
+  <body>
+    <div class="wrap">
+      <header class="top">
+        <a class="mark" href="./">Offee</a>
+        <a href="https://github.com/cnotv/offee">Source code</a>
+      </header>
+
+      <main>
+        <div class="hero">
+          <div>
+            <h1>Your paperwork, done on your own computer.</h1>
+            <p class="lead">
+              Offee fills in forms, drafts replies, translates letters and sums up meetings. The AI doing it runs on your Mac, so your passport scan, payslip or
+              contract never goes to someone else's server.
+            </p>
+            <div class="actions">
+              <a class="button" href="https://github.com/cnotv/offee/releases/tag/mac-preview">Download the Mac preview</a>
+              <a class="button quiet" href="#how">How it works</a>
+            </div>
+            <p class="small">The source code is public. Needs a Mac with Apple Silicon and 16 GB of memory. An early test build.</p>
+          </div>
+          <figure class="window">
+            <video id="demo" muted loop playsinline controls preload="metadata" width="1280" height="800" poster="media/offee-fill-a-form.png" aria-label="Offee reads a scanned personal data sheet into a profile, then fills a tenant form from that profile.">
+              <source src="media/offee-fill-a-form.mp4" type="video/mp4">
+            </video>
+            <script>
+              // Plays on its own unless the visitor asked for less motion; the controls pause it.
+              if (!matchMedia('(prefers-reduced-motion: reduce)').matches) document.getElementById('demo').play().catch(() => {})
+            </script>
+            <figcaption>A scan is read into a profile, then a tenant form is filled from it. Recorded on a Mac with the real app and its local model; the two waits for the model, about 5 and 1½ minutes, are cut and marked. The person is made up.</figcaption>
+          </figure>
+        </div>
+
+        <section id="how">
+          <div class="prose">
+            <h2>How it works, in plain words</h2>
+            <p>
+              Think of a locked office inside your computer. Offee works in that office with its own copy of whatever you hand it through the door, and nothing
+              else. It cannot look at your other files, and the office has no phone line to the outside.
+            </p>
+            <p>
+              You hand it a document, say what you need, and it does the dull part: it puts your name and address in the right boxes of a form, writes a reply in
+              your tone, or turns a recorded meeting into a summary with who does what. You check what it suggests before anything is saved.
+            </p>
+            <p>
+              Sometimes a bigger online AI would do better. Then you hold the key, and Offee itself cannot open the door. A switch in your menu bar decides what may
+              leave:
+            </p>
+          </div>
+
+          <fieldset class="switch">
+            <legend>Try the switch</legend>
+            <div class="positions">
+              <input type="radio" name="switch" id="sealed" checked>
+              <label for="sealed">Sealed</label>
+              <input type="radio" name="switch" id="ask">
+              <label for="ask">Ask</label>
+              <input type="radio" name="switch" id="open">
+              <label for="open">Open</label>
+            </div>
+            <div class="panel sealed">
+              <p><strong>Nothing leaves your computer.</strong> Every answer comes from the AI on your Mac. This is how Offee starts, every time.</p>
+            </div>
+            <div class="panel ask">
+              <p>
+                <strong>Each request waits for you.</strong> When a task could use an online AI, your Mac shows exactly what would be sent. You say yes or no, one
+                request at a time.
+              </p>
+            </div>
+            <div class="panel open">
+              <p><strong>Requests go out for a few minutes, then it seals itself again.</strong> Each one is still written down, so you can see later what left.</p>
+            </div>
+          </fieldset>
+        </section>
+
+        <section id="why">
+          <h2>Why not just use a search engine or an online AI?</h2>
+          <div class="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th scope="col"><span class="visually-hidden">Question</span></th>
+                  <th scope="col">An online AI or search engine</th>
+                  <th scope="col">Offee</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <th scope="row">Where your documents go</th>
+                  <td>To the company's servers, under its rules, sometimes used to train its next model.</td>
+                  <td>Nowhere. They stay on your Mac unless you let one request out.</td>
+                </tr>
+                <tr>
+                  <th scope="row">What it knows</th>
+                  <td>The web. Not your rental contract or last week's meeting.</td>
+                  <td>The files you gave it, and it shows which one each answer came from.</td>
+                </tr>
+                <tr>
+                  <th scope="row">What you get</th>
+                  <td>Text to copy and paste into the form yourself.</td>
+                  <td>The form itself, filled in and, if you like, signed.</td>
+                </tr>
+                <tr>
+                  <th scope="row">What it needs</th>
+                  <td>An account and an internet connection.</td>
+                  <td>No account. Once installed, no internet.</td>
+                </tr>
+                <tr>
+                  <th scope="row">Checking its work</th>
+                  <td>You trust what you are shown.</td>
+                  <td>Every task is logged: what went in, which AI answered, whether anything left.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="prose small">
+            The honest trade: an AI small enough for a laptop is slower than the big online ones and can be wrong. That is why Offee always shows its suggestions for
+            you to check first.
+          </p>
+        </section>
+
+        <section id="does">
+          <div class="prose">
+            <h2>What it does today</h2>
+            <h3>Fill and sign forms</h3>
+            <p>Open a PDF form and pick who you are filling it as. Offee fills in what it knows, you check each value, and it saves the PDF, signed if you want.</p>
+            <h3>Read a document into a profile</h3>
+            <p>Give it an ID, a CV or a scan of one, and your details land in a profile for you to check, ready for the next form.</p>
+            <h3>Reply to emails and chats</h3>
+            <p>Drop in a thread and say what you want to answer. You get a draft in your name and tone, based on your own documents.</p>
+            <h3>Translate</h3>
+            <p>A whole document, paragraph by paragraph, keeping the names, numbers and terms you care about.</p>
+            <h3>Sum up a meeting</h3>
+            <p>From notes or a recording: a summary, the decisions, and who does what by when.</p>
+          </div>
+          <figure class="window" style="max-width: 52rem; margin-top: 2rem">
+            <video controls preload="none" width="1280" height="800" poster="media/offee-features.png">
+              <source src="media/offee-features.mp4" type="video/mp4">
+            </video>
+            <figcaption>A 70 second tour of every page, recorded against a stand-in model, so the answers there are canned.</figcaption>
+          </figure>
+        </section>
+
+        <section id="get">
+          <h2>Get it</h2>
+          <ol class="steps">
+            <li>Download <code>Offee-arm64.dmg</code> from the <a href="https://github.com/cnotv/offee/releases/tag/mac-preview">Mac preview release</a> and drag Offee to Applications.</li>
+            <li>The preview is not notarized yet, so the first time right-click Offee and choose Open. On macOS 15, open it once, then allow it in System Settings, Privacy and Security.</li>
+            <li>Choose Set up Offee. It downloads the AI (about 10 GB) once, then opens. From then on it needs no internet.</li>
+            <li>Create a profile, or let Offee read one from a document, and try a form. Two made up documents to practise with are in <a href="https://github.com/cnotv/offee/tree/main/docs/demo">the demo folder</a>.</li>
+          </ol>
+          <p class="prose small">Prefer the terminal, or on Linux? The <a href="https://github.com/cnotv/offee#from-the-terminal">README</a> has the commands.</p>
+        </section>
+      </main>
+    </div>
+
+    <footer>
+      <div class="wrap">
+        <nav aria-label="Legal and project">
+          <a href="privacy.html">Privacy</a>
+          <a href="https://github.com/cnotv/offee">Source code</a>
+          <a href="https://github.com/cnotv/offee/issues">Report a problem</a>
+        </nav>
+      </div>
+    </footer>
+  </body>
+</html>

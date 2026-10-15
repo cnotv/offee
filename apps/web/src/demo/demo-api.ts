@@ -147,6 +147,9 @@ export const createDemoApi = (): OffeeApi => {
     deleteProfile: async (id) => {
       memory.profiles = memory.profiles.filter((profile) => profile.id !== id)
     },
+    readProfileDocument: async () => {
+      throw new Error('Demo mode has no model to read a document. On your machine Offee reads the details into the profile for you to check.')
+    },
     personas: async () => memory.personas,
     createPersona: async (input) => {
       const persona: Persona = { ...input, id: newId(), createdAt: Date.now() }

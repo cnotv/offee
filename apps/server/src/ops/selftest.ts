@@ -44,22 +44,28 @@ const checks: Check[] = [
         .some((line) => hostMountTypes.includes(line.split(' - ')[1]?.split(' ')[0] ?? '')),
   },
   { name: 'holds no API key', run: async () => !Object.keys(process.env).some((name) => /API_KEY|TOKEN|SECRET/i.test(name)) },
-  {
-    name: 'cannot get a request past the sealed gateway',
-    run: async () => {
-      const response = await fetch(`${process.env.OFFEE_GATEWAY_URL ?? 'http://gateway:8480'}/to/anthropic/v1/messages`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: '{}',
-        signal: AbortSignal.timeout(5000),
-      })
-      const body = await response.text()
-      return response.status === 403 && (body.includes('"sealed"') || body.includes('"missing-key"'))
-    },
-  },
 ]
 
-const results = await Promise.all(checks.map(async (check) => ({ name: check.name, passed: await check.run().catch(() => false) })))
+const gatewayCheck: Check = {
+  name: 'cannot get a request past the sealed gateway',
+  run: async () => {
+    const response = await fetch(`${process.env.OFFEE_GATEWAY_URL ?? 'http://gateway:8480'}/to/anthropic/v1/messages`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: '{}',
+      signal: AbortSignal.timeout(5000),
+    })
+    const body = await response.text()
+    return response.status === 403 && (body.includes('"sealed"') || body.includes('"missing-key"'))
+  },
+}
+
+const runCheck = async (check: Check) => ({ name: check.name, passed: await check.run().catch(() => false) })
+
+// The gateway goes first: the escape attempts' stalled name lookups fill Node's four resolver
+// threads, and the gateway's own lookup would queue behind them past its timeout.
+const gatewayResult = await runCheck(gatewayCheck)
+const results = [...(await Promise.all(checks.map(runCheck))), gatewayResult]
 results.forEach((result) => process.stdout.write(`  ${result.passed ? 'ok  ' : 'FAIL'} the app ${result.name}\n`))
 // A connection still stalling in the background must not keep the check running.
 process.exit(results.some((result) => !result.passed) ? 1 : 0)

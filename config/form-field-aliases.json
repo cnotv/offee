@@ -82,7 +82,13 @@
     "poste",
     "fonction",
     "cargo",
-    "puesto"
+    "puesto",
+    "occupation",
+    "profession",
+    "professione",
+    "occupazione",
+    "profesion",
+    "ocupacion"
   ],
   "street": [
     "street",
@@ -150,5 +156,21 @@
     "luogoedata",
     "lieu",
     "lugar"
+  ],
+  "dateOrPlaceOfBirth": [
+    "dateofbirth",
+    "birthdate",
+    "placeofbirth",
+    "birthplace",
+    "countryofbirth",
+    "geburtsdatum",
+    "geburtsort",
+    "geburtsland",
+    "datadinascita",
+    "luogodinascita",
+    "datedenaissance",
+    "lieudenaissance",
+    "fechadenacimiento",
+    "lugardenacimiento"
   ]
 }

@@ -23,6 +23,19 @@ export type Profile = {
 
 export type ProfileInput = Omit<Profile, 'id' | 'hasCertificate' | 'createdAt'>
 
+/** What a document says about the person, ready to check and save into a profile. */
+export type ProfileDetails = Pick<
+  ProfileInput,
+  'firstName' | 'lastName' | 'role' | 'organization' | 'email' | 'phone' | 'street' | 'postalCode' | 'city' | 'country' | 'languages' | 'facts'
+>
+
+export type ProfileReading = {
+  runId: string
+  fileName: string
+  details: ProfileDetails
+  model: ModelUsed
+}
+
 export type ModelPreference = 'local' | 'remote'
 
 export type Persona = {
@@ -62,7 +75,7 @@ export type ModelUsed = {
   fallbackReason: string | null
 }
 
-export type WorkflowKind = 'chat' | 'reply' | 'translate' | 'review' | 'transcribe' | 'form'
+export type WorkflowKind = 'chat' | 'reply' | 'translate' | 'review' | 'transcribe' | 'form' | 'profile'
 
 export type WorkflowContext = {
   profileId: string | null

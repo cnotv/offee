@@ -7,16 +7,51 @@ notes or recorded talks, translating, and drafting replies to emails and chats.
 
 Nothing leaves the machine unless you open the switch, and the app cannot open it itself.
 
-[![Offee in 70 seconds: chat with sources, leaving a page while the model writes, continuing from the run log, reply, translate and review](docs/media/offee-features.png)](docs/media/offee-features.mp4)
+![Offee reads a scanned personal data sheet into a profile, then fills a tenant form from it](docs/media/offee-fill-a-form.gif)
 
-[Watch the 70-second walkthrough](docs/media/offee-features.mp4). It was recorded against a
-stand-in model, so the answers are canned and the model badge reads "stand-in model (demo)".
+A scan of a personal data sheet is read into a new profile, checked and saved; then a tenant
+form is opened and filled from that profile. Recorded on a Mac against the real app and its
+local model; the two waits for the model (about 5 and 1½ minutes) are cut and marked. Every
+person and number in it is made up;
+the two documents are in [`docs/demo`](docs/demo) to try yourself.
+
+## In plain words
+
+**What it is.** Offee is a helper for paperwork that lives on your own computer. You give it
+your documents (an ID scan, a contract, an email, notes from a meeting) and ask it to do the
+dull part: fill in a form with your details, draft a reply, translate a letter, sum up a
+meeting. It does the work with an AI that runs on your Mac, not on someone else's server.
+
+**How it works.** Think of a locked office inside your computer. Offee works in that office
+with its own copy of everything you hand it through the door, and nothing else: it cannot look
+at your other files, and the office has no phone line to the outside. When you want an answer
+from a bigger online AI, you hold the key: you open the door for one request, see exactly what
+would leave, and say yes or no. Offee itself cannot open it.
+
+**Why not just use Google or an online AI?**
+
+- **Your papers stay with you.** Pasting a passport, a payslip or a contract into a website
+  means a copy now sits on a company's servers, under their rules, possibly used to train their
+  next model. With Offee nothing leaves your computer unless you let it, request by request.
+- **It knows your own documents.** A search engine knows the web, not your rental contract.
+  Offee answers from the files you gave it and shows which one each answer came from.
+- **It does the task, not just the talk.** It fills the actual PDF form and can sign it; it
+  writes the reply in your name and tone; it translates a whole document, paragraph by paragraph.
+- **No account, works offline.** Once it is installed, it needs no internet
+  at all.
+- **You can check everything.** Every run is logged: what went in, which model answered and
+  whether anything left the computer.
+
+**What to expect.** A model that fits on a laptop is slower than the big online ones and can
+be wrong, so Offee always shows its suggestions for you to check before anything is saved. It
+needs a Mac with Apple Silicon and 16 GB of memory.
 
 ## Concepts
 
 - **Profile:** an identity you act as. Name, role, contact details used in forms, signature
   image and signing certificate, languages, tone. One person usually keeps several (personal,
-  employee, company director), so there are no accounts: one unlock opens them all.
+  employee, company director), so there are no accounts: one unlock opens them all. "Read from
+  a document" fills a profile from an ID, a CV or a scan, for you to check before saving.
 - **Persona:** an assistant role, such as "contract reviewer" or "support replier". It holds
   instructions, the model to use, the tools it may call and whether it may use a remote model.
 - **Knowledge:** documents assigned to a profile or a persona, indexed so answers can cite
@@ -30,6 +65,7 @@ stand-in model, so the answers are canned and the model badge reads "stand-in mo
 | Workflow            | In                                        | Out                                   |
 | ------------------- | ----------------------------------------- | ------------------------------------- |
 | Fill and sign       | a PDF form and a profile                  | the filled PDF, signed                |
+| Read into a profile | an ID, a CV or a scan of either           | the person's details, to check and save |
 | Review              | notes, text, or a recording of a talk     | a structured review, DOCX or PDF      |
 | Translate           | a document and a target language          | the document translated, layout kept  |
 | Draft a reply       | an email (`.eml`, `.mbox`) or chat thread | a reply grounded in your knowledge    |
@@ -68,7 +104,7 @@ stand-in model, so the answers are canned and the model badge reads "stand-in mo
 ## Models
 
 - **Local, the default:** llama.cpp serves the chat model, embeddings and reranker;
-  whisper.cpp transcribes; Tesseract reads scans. On Apple Silicon the GPU reaches the VM
+  whisper.cpp transcribes; Tesseract 5.5 (English, German and Italian data, Apache 2.0, from Alpine's signed packages) reads scans and photos. On Apple Silicon the GPU reaches the VM
   through Colima's `krunkit` VM type.
 - **Remote, only through the switch:** Claude and other providers, per persona.
 - **Updates without a network:** models ship as signed bundles, verified offline and imported
@@ -165,7 +201,6 @@ then `offee switch ask` and `offee watch` in a second terminal.
 
 - **Encryption at rest of its own:** data sits in the VM's disk, inside your user folder, which
   FileVault encrypts. A passphrase-unlocked volume is [#3](https://github.com/cnotv/offee/issues/3).
-- **Scanned documents:** text must be selectable; OCR comes later.
 - **Translation layout:** paragraphs are kept, tables and styling are not.
 - **Signatures:** the PDF signature is a CAdES detached signature with a self-signed
   certificate, valid and tamper-evident, but it lacks the signing-certificate attribute a strict

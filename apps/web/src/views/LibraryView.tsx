@@ -121,7 +121,7 @@ export const LibraryView = () => {
     <Flex direction="column" gap="4" className="page-wide">
       <Flex gap="3" align="center" wrap="wrap">
         <FilePickerButton
-          accept=".pdf,.docx,.txt,.md,.eml,.csv,.json"
+          accept=".pdf,.docx,.txt,.md,.eml,.csv,.json,.png,.jpg,.jpeg,.tif,.tiff"
           disabled={action.busy}
           onPick={(file) => action.run(async () => {
             await api.uploadDocument(file, uploadAssignment)
