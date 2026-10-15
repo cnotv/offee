@@ -45,7 +45,7 @@ would leave, and say yes or no. Offee itself cannot open it.
 
 **What to expect.** A model that fits on a laptop is slower than the big online ones and can
 be wrong, so Offee always shows its suggestions for you to check before anything is saved. It
-needs a Mac with Apple Silicon and 16 GB of memory.
+needs a Mac with Apple Silicon or a Linux PC, and 16 GB of memory.
 
 ## Concepts
 
@@ -109,7 +109,7 @@ Offee relies on FileVault for now. A volume that opens only with your passphrase
 
 ## Platforms
 
-macOS on Apple Silicon first, then Linux. Windows (WSL2) later.
+macOS on Apple Silicon, and Linux on x64 and arm64. Windows (WSL2) later.
 
 ## Prior art
 
@@ -156,6 +156,36 @@ permissions but copying text, and no request, link or navigation off `127.0.0.1:
 last part matters: the page comes from the VM but runs on the Mac, which has a network. In an
 ordinary browser a compromised app could send data out from the page itself, around the
 gateway; the Mac app's window cannot, because the host blocks it, not the page.
+
+### The Linux app
+
+On Linux (x64 or arm64, 16 GB of memory or more, with virtualization turned on so `/dev/kvm`
+exists):
+
+1. Install [Colima](https://colima.run) and the Docker CLI with Compose.
+2. Download the package for your machine from the
+   [Linux preview release](https://github.com/cnotv/offee/releases/tag/linux-preview).
+   On Debian or Ubuntu, install the `.deb`:
+
+   ```sh
+   sudo apt install ./Offee-linux-x64.deb
+   ```
+
+   Elsewhere, unpack the `.tar.gz` and make Chromium's sandbox helper setuid root, which the
+   `.deb` does for you; Offee keeps its sandbox on rather than starting without one:
+
+   ```sh
+   tar -xzf Offee-linux-x64.tar.gz
+   sudo chown root:root Offee-linux-x64/chrome-sandbox
+   sudo chmod 4755 Offee-linux-x64/chrome-sandbox
+   ./Offee-linux-x64/offee
+   ```
+
+3. Open Offee from your applications and choose **Set up Offee**.
+
+It works like the Mac app, with the tray icon in place of the menu bar icon. Desktops that
+show no tray icon (GNOME without an AppIndicator extension) still work: open Offee again from
+your applications to bring its window back. The log is `~/.config/Offee/logs/offee.log`.
 
 ### From the terminal
 

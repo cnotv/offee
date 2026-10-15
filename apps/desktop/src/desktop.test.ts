@@ -74,7 +74,7 @@ describe('the menu bar', () => {
 describe('explaining a failed setup', () => {
   it('lists every failed machine check', () => {
     const output = 'Checking this machine\n  ok    32 GB of memory\n  FAIL  Setup needs 25 GB free on disk; there are 12 GB\n  FAIL  cannot reach ghcr.io\noffee: Fix the 2 problem(s) above'
-    expect(describeFailure(output, '/log')).toBe('This Mac is not ready for Offee yet:\n• Setup needs 25 GB free on disk; there are 12 GB\n• cannot reach ghcr.io')
+    expect(describeFailure(output, '/log')).toBe('This computer is not ready for Offee yet:\n• Setup needs 25 GB free on disk; there are 12 GB\n• cannot reach ghcr.io')
   })
 
   it("gives the launcher's own reason, and the log", () => {

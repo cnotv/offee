@@ -12,7 +12,7 @@ const launcherMessagePrefix = 'offee: '
 export const describeFailure = (output: string, logFile: string): string => {
   const lines = output.split('\n').map((line) => line.trim())
   const failedChecks = lines.filter((line) => line.startsWith(checkFailurePrefix)).map((line) => line.slice(checkFailurePrefix.length))
-  if (failedChecks.length > 0) return `This Mac is not ready for Offee yet:\n${failedChecks.map((check) => `• ${check}`).join('\n')}`
+  if (failedChecks.length > 0) return `This computer is not ready for Offee yet:\n${failedChecks.map((check) => `• ${check}`).join('\n')}`
   const launcherReason = lines.findLast((line) => line.startsWith(launcherMessagePrefix))?.slice(launcherMessagePrefix.length)
   const logHint = `The full log is in ${logFile}.`
   return launcherReason === undefined ? `Something failed. ${logHint}` : `${launcherReason}\n${logHint}`

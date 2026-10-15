@@ -83,7 +83,7 @@ export const ControlView = () => {
         <Card size="3">
           <Flex direction="column" gap="3">
             <Text size="2">
-              Offee runs in a Linux virtual machine on this Mac that shares no folder with it. Setup installs what is missing, creates the
+              Offee runs in a Linux virtual machine on this computer that shares no folder with it. Setup installs what is missing, creates the
               machine and downloads the local models.
             </Text>
             <Flex gap="2">
@@ -121,7 +121,7 @@ export const ControlView = () => {
           <Flex direction="column" gap="3">
             <Flex justify="between" align="center" gap="2" wrap="wrap">
               <Text size="2" weight="medium">
-                What may leave this Mac
+                What may leave this computer
               </Text>
               {state.gateway?.mode === 'open' ? <LockOpen1Icon /> : <LockClosedIcon />}
             </Flex>
@@ -132,7 +132,7 @@ export const ControlView = () => {
               <SegmentedControl.Item value="open-60">Open 1 hour</SegmentedControl.Item>
             </SegmentedControl.Root>
             <Text size="1" color="gray">
-              Sealed: nothing leaves. Ask: each request waits for you in a Mac dialog showing what would be sent. Open: listed destinations only,
+              Sealed: nothing leaves. Ask: each request waits for you in a dialog showing what would be sent. Open: listed destinations only,
               closing again on its own.
             </Text>
             <Separator size="4" />
@@ -158,7 +158,7 @@ export const ControlView = () => {
                 </Button>
               </Flex>
               <Text size="1" color="gray">
-                Stored on this Mac and given only to the gateway, never to Offee. Saving restarts the gateway sealed.
+                Stored on this computer and given only to the gateway, never to Offee. Saving restarts the gateway sealed.
               </Text>
             </Flex>
             <Separator size="4" />

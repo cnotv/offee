@@ -52,7 +52,7 @@ const runtime: {
   longRunningLauncher: null,
 }
 
-// Everything the launcher prints and every error lands here, so a failure on someone's Mac
+// Everything the launcher prints and every error lands here, so a failure on someone's computer
 // can be read afterwards.
 const writeLog = (text: string): void => {
   try {
@@ -246,12 +246,14 @@ const runSetup = async (): Promise<void> => {
   const { response } = await dialog.showMessageBox({
     type: 'info',
     title: 'Set up Offee',
-    message: 'Set up Offee on this Mac?',
+    message: 'Set up Offee on this computer?',
     detail: [
       'This will:',
-      '• check this Mac (memory, disk space, the network) and clear what an earlier attempt left behind',
-      '• install Colima and the Docker command-line tools with Homebrew, if they are missing',
-      '• create a Linux virtual machine that shares no folder with your Mac',
+      '• check this computer (memory, disk space, the network) and clear what an earlier attempt left behind',
+      process.platform === 'darwin'
+        ? '• install Colima and the Docker command-line tools with Homebrew, if they are missing'
+        : '• use the Colima and Docker command-line tools you installed',
+      '• create a Linux virtual machine that shares no folder with this computer',
       '• download the local models and images, about 10 GB',
       '',
       'It takes 10 to 30 minutes. Nothing you add to Offee later leaves the machine unless you open the switch.',
@@ -406,8 +408,10 @@ const lockDownWebContents = (contents: WebContents): void => {
   })
 }
 
+// macOS tints a black template image to suit the menu bar; Linux panels can be light or dark,
+// so they get the coloured app icon.
 const createTray = (): void => {
-  const icon = nativeImage.createFromPath(join(distDirectory, 'assets', 'trayTemplate.png'))
+  const icon = nativeImage.createFromPath(join(distDirectory, 'assets', process.platform === 'darwin' ? 'trayTemplate.png' : 'tray.png'))
   icon.setTemplateImage(true)
   runtime.tray = new Tray(icon)
   runtime.tray.setToolTip('Offee')
@@ -432,7 +436,10 @@ app.on('web-contents-created', (_event, contents) => lockDownWebContents(content
 app.on('window-all-closed', () => {
   // Offee keeps running from the menu bar.
 })
-app.on('activate', () => (runtime.state.phase === 'running' ? openOffeeWindow() : openControlWindow()))
+const showWindow = (): void => (runtime.state.phase === 'running' ? openOffeeWindow() : openControlWindow())
+app.on('activate', showWindow)
+// Many Linux desktops show no tray icon, so opening Offee again is how its windows come back.
+app.on('second-instance', showWindow)
 app.on('before-quit', stopInBackground)
 
 if (smokeTest) {
@@ -459,4 +466,8 @@ const startApp = (): void => {
   }
 }
 
-app.whenReady().then(startApp).catch(reportUnexpectedError)
+if (app.requestSingleInstanceLock()) {
+  app.whenReady().then(startApp).catch(reportUnexpectedError)
+} else {
+  app.quit()
+}
