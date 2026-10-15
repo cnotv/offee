@@ -151,6 +151,13 @@ starts or stops the VM. Quitting the app stops the VM. When something goes wrong
 file** in the same menu opens `~/Library/Logs/Offee/offee.log`, which holds every launcher run
 and error.
 
+**Check for updates…** asks GitHub for the newest preview build, only when you choose it, from
+the Mac rather than from Offee. **Install update** downloads it, refuses it unless its SHA-256
+matches the one GitHub lists, replaces `/Applications/Offee.app` and restarts; the first start
+afterwards rebuilds the containers. An app that runs from elsewhere opens the disk image for
+you to drag over instead. The checksum proves the file is the one GitHub serves, not who built
+it: the app is not notarized.
+
 The window that shows Offee is a locked-down browser: no Node.js, no bridge to the app, no
 permissions but copying text, and no request, link or navigation off `127.0.0.1:8470`. That
 last part matters: the page comes from the VM but runs on the Mac, which has a network. In an
@@ -186,6 +193,9 @@ exists):
 It works like the Mac app, with the tray icon in place of the menu bar icon. Desktops that
 show no tray icon (GNOME without an AppIndicator extension) still work: open Offee again from
 your applications to bring its window back. The log is `~/.config/Offee/logs/offee.log`.
+Updates work the same way: the `.deb` installs through `pkexec`, which asks for your password
+in the desktop's own dialog; the `.tar.gz` opens the release page, since its `chrome-sandbox`
+needs root again.
 
 ### From the terminal
 
@@ -218,7 +228,7 @@ the same command.
 | `offee key anthropic` | Store the key the gateway uses for Claude. The app never sees it |
 | `offee model list` / `use <repo>` | See or change the local model |
 | `offee selftest` | Prove the app reaches neither the internet nor the host |
-| `offee update` | Rebuild after `git pull` |
+| `offee update` | Start the VM and rebuild after `git pull` |
 | `offee destroy` | Delete the VM and everything in it |
 
 Start with a profile and a persona, add a few documents to the library, then try each workflow.

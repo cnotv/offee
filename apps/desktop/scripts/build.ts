@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process'
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { Resvg } from '@resvg/resvg-js'
@@ -10,6 +11,9 @@ import { appIconSource } from './packaging.ts'
 
 const root = join(import.meta.dirname, '..')
 const dist = join(root, 'dist')
+// The app compares this with the newest release to offer an update. CI passes the commit the
+// release is published from, since a pull request checks out a merge commit instead.
+const buildCommit = process.env.OFFEE_BUILD_COMMIT ?? execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim()
 
 await bundle({
   entryPoints: [join(root, 'src', 'main.ts')],
@@ -19,6 +23,7 @@ await bundle({
   format: 'esm',
   target: 'node22',
   external: ['electron'],
+  define: { OFFEE_BUILD_COMMIT: JSON.stringify(buildCommit) },
 })
 
 // A sandboxed preload must be a single CommonJS file, whatever the source is written as.
