@@ -90,10 +90,10 @@ export const formTask =
 
 export const fieldPlacementTask =
   'This PDF form has no fillable fields. Its text is listed one line per row as "line number (page): text". ' +
-  'Pick the lines that are labels of something a person writes in or ticks, and for each give: "line", its number; "name", a short name for what goes there, in the form\'s language; ' +
-  '"kind", "checkbox" for a choice to tick, otherwise "text"; and "position": for a checkbox "left", the box before its label; for text "right" when the answer goes on the same line after the label (a label ending in a colon or followed by dots), ' +
-  '"above" when the label is printed under its blank line, otherwise "below". ' +
-  'Leave out headings, instructions, notes and page numbers. Answer with JSON only.'
+  'Pick the lines that are labels of something a person writes in or ticks, and give each as one string "line kind position": ' +
+  'kind is "checkbox" for a choice to tick, otherwise "text"; position is "left" for a checkbox whose box is before its label, ' +
+  'for text "right" when the answer goes on the same line after the label (a label ending in a colon or followed by dots), "above" when the label is printed under its blank line, otherwise "below". ' +
+  'For example {"fields": ["12 text below", "15 checkbox left"]}. Leave out headings, instructions, notes and page numbers. Answer with JSON only.'
 
 export const profileDetailsTask =
   'Pick out the details about the person this document describes. Copy each value exactly as the document writes it, and leave a field empty when the document does not give it. ' +

@@ -19,7 +19,7 @@ import { createSigningCertificate } from '../forms/certificate.ts'
 import type { FieldAliases } from '../forms/match-fields.ts'
 import { suggestFromProfile } from '../forms/match-fields.ts'
 import type { TextLine } from '../forms/flat-form.ts'
-import { addPlacedFields, fieldPlacementSchemaFor, fieldPlacementsFromModelAnswer, readTextLines, usablePlacedFields } from '../forms/flat-form.ts'
+import { addPlacedFields, fieldPlacementSchema, fieldPlacementsFromModelAnswer, readTextLines, usablePlacedFields } from '../forms/flat-form.ts'
 import { fillForm, readFormFields } from '../forms/pdf-form.ts'
 import { chunkText } from '../knowledge/chunk-text.ts'
 import type { Generation, Models } from '../llm/generate.ts'
@@ -92,7 +92,7 @@ export const createWorkflows = (dependencies: WorkflowDependencies) => {
         messages: [{ role: 'user', content: `<form>\n${batch.map(listingLineOf).join('\n')}\n</form>` }],
         maxTokens: 4096,
         signal,
-        jsonSchema: fieldPlacementSchemaFor(batch),
+        jsonSchema: fieldPlacementSchema,
       }),
     )
     dependencies.runs.record({
