@@ -53,6 +53,11 @@ jobs:
           mkdir -p "$RUNNER_TEMP/standin"
           echo '<!doctype html><title>Offee</title><p>Offee stand-in</p>' > "$RUNNER_TEMP/standin/index.html"
           python3 -m http.server 8470 --bind 127.0.0.1 --directory "$RUNNER_TEMP/standin" > /dev/null 2>&1 &
+          # The stand-in binds the port before it listens, and on macOS a connection made in between
+          # hangs instead of being refused, so the app starts only once the stand-in answers.
+          waited=$SECONDS
+          curl -sf -o /dev/null --connect-timeout 1 --retry 60 --retry-delay 1 --retry-all-errors http://127.0.0.1:8470/
+          echo "stand-in answered after $((SECONDS - waited)) s"
           OFFEE_HOME="$RUNNER_TEMP/offee-home" OFFEE_SMOKE_TEST=1 perl -e 'alarm 60; exec @ARGV' "$app" 2>&1 | tee "$RUNNER_TEMP/offee.log" || true
           cat "$HOME/Library/Logs/Offee/offee.log" 2>/dev/null || true
           grep -q "smoke: settings window rendered" "$RUNNER_TEMP/offee.log"
