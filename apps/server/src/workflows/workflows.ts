@@ -18,7 +18,8 @@ import { textToDocx } from '../exports/docx-export.ts'
 import { createSigningCertificate } from '../forms/certificate.ts'
 import type { FieldAliases } from '../forms/match-fields.ts'
 import { suggestFromProfile } from '../forms/match-fields.ts'
-import { addPlacedFields, fieldPlacementSchemaFor, fieldPlacementsFromModelAnswer, readTextLines } from '../forms/flat-form.ts'
+import type { TextLine } from '../forms/flat-form.ts'
+import { addPlacedFields, fieldPlacementSchemaFor, fieldPlacementsFromModelAnswer, readTextLines, usablePlacedFields } from '../forms/flat-form.ts'
 import { fillForm, readFormFields } from '../forms/pdf-form.ts'
 import { chunkText } from '../knowledge/chunk-text.ts'
 import type { Generation, Models } from '../llm/generate.ts'
@@ -28,6 +29,7 @@ import type { FileStore } from '../store/file-store.ts'
 import type { PersonaStore, ProfileStore } from '../store/profile-store.ts'
 import type { RunStore } from '../store/run-store.ts'
 import type { Transcriber } from '../transcription/transcriber.ts'
+import { batchByLength } from './batch-by-length.ts'
 import { suggestionsFromModelAnswer, formSchemaFor } from './form-answer.ts'
 import { inSequence } from './in-sequence.ts'
 import { profileDetailsFromModelAnswer, profileDetailsSchema } from './profile-details.ts'
@@ -55,6 +57,12 @@ const condenseChunkLength = 12_000
 // A document about a person states the details early; the rest would only crowd the context.
 const profileDocumentLimit = 24_000
 
+// A long form is read in batches, each with room for its answer within a 16k-token local context.
+const placementBatchLength = 12_000
+const suggestionBatchLength = 8_000
+
+const listingLineOf = (line: TextLine): string => `${line.id} (${line.page}): ${line.text}`
+
 const combine = (generations: Generation[]): Pick<Generation, 'model' | 'outbound'> => ({
   model: generations.at(-1)?.model ?? { kind: 'local', name: 'local model', fallbackReason: null },
   outbound: generations.flatMap((generation) => generation.outbound),
@@ -76,24 +84,28 @@ export const createWorkflows = (dependencies: WorkflowDependencies) => {
     if ((await readFormFields(upload.content)).length > 0) return []
     const lines = await readTextLines(upload.content)
     if (lines.length === 0) return []
-    const listing = lines.map((line) => `${line.id} (${line.page}): ${line.text}`).join('\n')
-    const generation = await generate(dependencies.models, {
-      persona,
-      system: systemPrompt(persona, undefined, fieldPlacementTask),
-      messages: [{ role: 'user', content: `<form>\n${listing}\n</form>` }],
-      maxTokens: 8192,
-      signal,
-      jsonSchema: fieldPlacementSchemaFor(lines),
-    })
+    const batches = batchByLength(lines, (line) => listingLineOf(line).length + 1, placementBatchLength)
+    const generations = await inSequence(batches, (batch) =>
+      generate(dependencies.models, {
+        persona,
+        system: systemPrompt(persona, undefined, fieldPlacementTask),
+        messages: [{ role: 'user', content: `<form>\n${batch.map(listingLineOf).join('\n')}\n</form>` }],
+        maxTokens: 4096,
+        signal,
+        jsonSchema: fieldPlacementSchemaFor(batch),
+      }),
+    )
     dependencies.runs.record({
       workflow: 'form',
       title: `Fields placed on ${upload.name}`,
-      model: generation.model,
-      input: listing,
-      output: generation.text,
-      outbound: generation.outbound,
+      ...combine(generations),
+      input: lines.map(listingLineOf).join('\n'),
+      output: generations.map((generation) => generation.text).join('\n\n'),
     })
-    return fieldPlacementsFromModelAnswer(generation.text, lines)
+    return usablePlacedFields(
+      generations.flatMap((generation) => fieldPlacementsFromModelAnswer(generation.text, lines)),
+      lines,
+    )
   }
 
   // The form is kept without the placed fields, so a correction to where they go applies on save.
@@ -230,30 +242,34 @@ export const createWorkflows = (dependencies: WorkflowDependencies) => {
       )
       if (profile === undefined || unanswered.length === 0) return { formFileId, fileName: upload.name, fields, suggestions: fromProfile, model: null, placedFields }
 
-      const citations = dependencies.documents.search(unanswered.map((field) => field.name).join(' '), context)
-      const generation = await generate(dependencies.models, {
-        persona,
-        system: systemPrompt(persona, profile, formTask),
-        messages: [
-          {
-            role: 'user',
-            content: `${knowledgeBlock(citations)}\n\nToday is ${today}. Fields to fill:\n${JSON.stringify(unanswered.map((field) => ({ name: field.name, kind: field.kind, options: field.options })))}`,
-          },
-        ],
-        maxTokens: 2048,
-        signal,
-        jsonSchema: formSchemaFor(unanswered),
-      })
-      const suggestions = suggestionsFromModelAnswer(fromProfile, generation.text)
+      const describeField = (field: (typeof unanswered)[number]): string => JSON.stringify({ name: field.name, kind: field.kind, options: field.options })
+      const batches = batchByLength(unanswered, (field) => describeField(field).length + 1, suggestionBatchLength)
+      const generations = await inSequence(batches, (batch) =>
+        generate(dependencies.models, {
+          persona,
+          system: systemPrompt(persona, profile, formTask),
+          messages: [
+            {
+              role: 'user',
+              content: `${knowledgeBlock(dependencies.documents.search(batch.map((field) => field.name).join(' '), context))}\n\nToday is ${today}. Fields to fill:\n[${batch.map(describeField).join(',')}]`,
+            },
+          ],
+          maxTokens: 2048,
+          signal,
+          jsonSchema: formSchemaFor(batch),
+        }),
+      )
+      const suggestions = generations.reduce((current, generation) => suggestionsFromModelAnswer(current, generation.text), fromProfile)
+      const { model, outbound } = combine(generations)
       dependencies.runs.record({
         workflow: 'form',
         title: `Suggestions for ${upload.name}`,
-        model: generation.model,
+        model,
         input: JSON.stringify(unanswered),
-        output: generation.text,
-        outbound: generation.outbound,
+        output: generations.map((generation) => generation.text).join('\n\n'),
+        outbound,
       })
-      return { formFileId, fileName: upload.name, fields, suggestions, model: generation.model, placedFields }
+      return { formFileId, fileName: upload.name, fields, suggestions, model, placedFields }
     },
 
     // Always the local model, whatever the persona allows: a document about a person stays here.
