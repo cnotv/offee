@@ -72,7 +72,7 @@ export const createWorkflows = (dependencies: WorkflowDependencies) => {
     dependencies.files.put({ name: `${title.replace(/[^\p{L}\p{N} _-]+/gu, '').trim() || 'offee'}.docx`, mimeType: docxMimeType, content: await textToDocx(title, text) })
 
   return {
-    chat: async (request: ChatRequest): Promise<WorkflowResult> => {
+    chat: async (request: ChatRequest, signal: AbortSignal): Promise<WorkflowResult> => {
       const { profile, persona } = resolve(request)
       const citations = dependencies.documents.search(request.message, request)
       const generation = await generate(dependencies.models, {
@@ -80,6 +80,7 @@ export const createWorkflows = (dependencies: WorkflowDependencies) => {
         system: systemPrompt(persona, profile, chatTask),
         messages: [...request.history, { role: 'user', content: `${knowledgeBlock(citations)}\n\nQuestion: ${request.message}` }],
         maxTokens: 2048,
+        signal,
       })
       const runId = dependencies.runs.record({
         workflow: 'chat',
@@ -93,7 +94,7 @@ export const createWorkflows = (dependencies: WorkflowDependencies) => {
       return { runId, text: generation.text, citations, model: generation.model, outputFileId: null }
     },
 
-    reply: async (request: ReplyRequest): Promise<WorkflowResult> => {
+    reply: async (request: ReplyRequest, signal: AbortSignal): Promise<WorkflowResult> => {
       const { profile, persona } = resolve(request)
       const citations = dependencies.documents.search(`${request.thread.slice(-4000)} ${request.guidance}`, request)
       const generation = await generate(dependencies.models, {
@@ -112,6 +113,7 @@ export const createWorkflows = (dependencies: WorkflowDependencies) => {
           },
         ],
         maxTokens: 2048,
+        signal,
       })
       const runId = dependencies.runs.record({
         workflow: 'reply',
@@ -124,11 +126,11 @@ export const createWorkflows = (dependencies: WorkflowDependencies) => {
       return { runId, text: generation.text, citations, model: generation.model, outputFileId: null }
     },
 
-    translate: async (request: TranslateRequest): Promise<WorkflowResult> => {
+    translate: async (request: TranslateRequest, signal: AbortSignal): Promise<WorkflowResult> => {
       const { profile, persona } = resolve(request)
       const system = systemPrompt(persona, profile, translateTask(request.targetLanguage, request.glossary))
       const generations = await inSequence(chunkText(request.text, translationChunkLength), (chunk) =>
-        generate(dependencies.models, { persona, system, messages: [{ role: 'user', content: chunk }], maxTokens: 4096 }),
+        generate(dependencies.models, { persona, system, messages: [{ role: 'user', content: chunk }], maxTokens: 4096, signal }),
       )
       const text = generations.map((generation) => generation.text).join('\n\n')
       const { model, outbound } = combine(generations)
@@ -138,7 +140,7 @@ export const createWorkflows = (dependencies: WorkflowDependencies) => {
       return { runId, text, citations: [], model, outputFileId }
     },
 
-    review: async (request: ReviewRequest): Promise<WorkflowResult> => {
+    review: async (request: ReviewRequest, signal: AbortSignal): Promise<WorkflowResult> => {
       const { profile, persona } = resolve(request)
       const template = dependencies.reviewTemplates.find((candidate) => candidate.id === request.templateId)
       if (template === undefined) throw new Error('Unknown review template')
@@ -153,6 +155,7 @@ export const createWorkflows = (dependencies: WorkflowDependencies) => {
                 system: systemPrompt(persona, profile, condenseTask),
                 messages: [{ role: 'user', content: part }],
                 maxTokens: 2048,
+                signal,
               }),
             )
       const material = condensed.length === 0 ? request.source : condensed.map((generation) => generation.text).join('\n\n')
@@ -161,6 +164,7 @@ export const createWorkflows = (dependencies: WorkflowDependencies) => {
         system: systemPrompt(persona, profile, reviewTask(template)),
         messages: [{ role: 'user', content: `<material>\n${material}\n</material>` }],
         maxTokens: 4096,
+        signal,
       })
       const { model, outbound } = combine([...condensed, final])
       const title = `${template.name} review`
@@ -169,8 +173,8 @@ export const createWorkflows = (dependencies: WorkflowDependencies) => {
       return { runId, text: final.text, citations: [], model, outputFileId }
     },
 
-    transcribe: async (audio: { name: string; content: Uint8Array }): Promise<TranscriptionResult> => {
-      const text = await dependencies.transcriber.transcribe(audio)
+    transcribe: async (audio: { name: string; content: Uint8Array }, signal: AbortSignal): Promise<TranscriptionResult> => {
+      const text = await dependencies.transcriber.transcribe(audio, signal)
       const runId = dependencies.runs.record({
         workflow: 'transcribe',
         title: `Transcript of ${audio.name}`,
@@ -182,7 +186,7 @@ export const createWorkflows = (dependencies: WorkflowDependencies) => {
       return { runId, text }
     },
 
-    inspectForm: async (upload: { name: string; content: Uint8Array }, context: WorkflowContext): Promise<FormInspection> => {
+    inspectForm: async (upload: { name: string; content: Uint8Array }, context: WorkflowContext, signal: AbortSignal): Promise<FormInspection> => {
       const { profile, persona } = resolve(context)
       const fields = await readFormFields(upload.content)
       const formFileId = dependencies.files.put({ name: upload.name, mimeType: 'application/pdf', content: upload.content })
@@ -204,6 +208,7 @@ export const createWorkflows = (dependencies: WorkflowDependencies) => {
           },
         ],
         maxTokens: 2048,
+        signal,
         jsonSchema: formSchemaFor(unanswered),
       })
       const suggestions = suggestionsFromModelAnswer(fromProfile, generation.text)
@@ -219,12 +224,13 @@ export const createWorkflows = (dependencies: WorkflowDependencies) => {
     },
 
     // Always the local model, whatever the persona allows: a document about a person stays here.
-    readProfileDocument: async (document: { name: string; text: string }): Promise<ProfileReading> => {
+    readProfileDocument: async (document: { name: string; text: string }, signal: AbortSignal): Promise<ProfileReading> => {
       const generation = await generate(dependencies.models, {
         persona: undefined,
         system: systemPrompt(undefined, undefined, profileDetailsTask),
         messages: [{ role: 'user', content: `<document>\n${document.text.slice(0, profileDocumentLimit)}\n</document>` }],
         maxTokens: 2048,
+        signal,
         jsonSchema: profileDetailsSchema(),
       })
       const runId = dependencies.runs.record({

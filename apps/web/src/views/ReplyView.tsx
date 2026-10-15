@@ -25,7 +25,7 @@ export const ReplyView = () => {
           <FilePickerButton
             accept=".eml,.mbox,.txt,.md"
             disabled={page.busy}
-            onPick={(file) => page.run(async () => page.set({ thread: (await api.extractText(file)).text }))}
+            onPick={(file) => page.run({ kind: 'extract', label: `Reading ${file.name}` }, async (signal) => page.set({ thread: (await api.extractText(file, signal)).text }))}
           >
             Load an .eml file
           </FilePickerButton>
@@ -42,7 +42,7 @@ export const ReplyView = () => {
         <Button
           loading={page.busy}
           disabled={thread.trim() === ''}
-          onClick={() => page.run(async () => page.set({ result: await api.reply({ profileId, personaId, thread, guidance }) }))}
+          onClick={() => page.run({ kind: 'reply', label: 'Drafting a reply' }, async (signal) => page.set({ result: await api.reply({ profileId, personaId, thread, guidance }, signal) }))}
         >
           <Pencil2Icon /> Draft the reply
         </Button>

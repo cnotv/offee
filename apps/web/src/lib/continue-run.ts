@@ -11,6 +11,7 @@ export const emptyWorkflowPages = (newConversationId: () => string): WorkflowPag
   reply: { thread: '', guidance: '', result: null },
   translate: { text: '', targetLanguage: 'English', glossary: '', result: null },
   review: { templateId: 'meeting', source: '', result: null },
+  forms: { inspection: null, values: [], result: null },
 })
 
 const shownResult = (run: RunDetail): ShownResult => ({ runId: run.id, text: run.output, citations: [], model: run.model, outputFileId: null })

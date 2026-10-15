@@ -6,6 +6,7 @@ export type RemoteRequest = {
   system: string
   messages: { role: 'user' | 'assistant'; content: string }[]
   maxTokens: number
+  signal: AbortSignal
 }
 
 export type RemoteOutcome =
@@ -60,13 +61,15 @@ export const createRemoteModel = (options: { gatewayUrl: string; model: string }
           fallbacks: 'default',
           system: request.system,
           messages: request.messages,
-        })
+        }, { signal: request.signal })
         if (response.stop_reason === 'refusal') {
           return { ok: false, reason: 'The remote model declined this request', reachedProvider: true }
         }
         const text = response.content.flatMap((block) => (block.type === 'text' ? [block.text] : [])).join('').trim()
         return { ok: true, text, model: response.model }
       } catch (error) {
+        // Stopped by the person: there is nothing to fall back to.
+        if (error instanceof Anthropic.APIUserAbortError) throw error
         const refusal = gatewayRefusalOf(error)
         if (refusal !== null) return { ok: false, reason: refusal.detail, reachedProvider: false }
         if (error instanceof Anthropic.APIConnectionError) {

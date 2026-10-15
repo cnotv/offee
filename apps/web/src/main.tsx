@@ -8,6 +8,7 @@ import { createBrowserRouter, Navigate, RouterProvider } from 'react-router'
 import { AppShell } from '@/components/AppShell'
 import { useColorScheme } from '@/hooks/useColorScheme'
 import { DirectoryProvider } from '@/hooks/useDirectory'
+import { OperationsProvider } from '@/hooks/useOperations'
 import { WorkContextProvider } from '@/hooks/useWorkContext'
 import { WorkflowPagesProvider } from '@/hooks/useWorkflowPages'
 import { ChatView } from '@/views/ChatView'
@@ -52,9 +53,11 @@ createRoot(rootElement).render(
     <SystemTheme>
       <DirectoryProvider>
         <WorkContextProvider>
-          <WorkflowPagesProvider>
-            <RouterProvider router={router} />
-          </WorkflowPagesProvider>
+          <OperationsProvider>
+            <WorkflowPagesProvider>
+              <RouterProvider router={router} />
+            </WorkflowPagesProvider>
+          </OperationsProvider>
         </WorkContextProvider>
       </DirectoryProvider>
     </SystemTheme>
