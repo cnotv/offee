@@ -1,6 +1,7 @@
 {
   "name": "@offee/desktop",
   "productName": "Offee",
+  "desktopName": "offee.desktop",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -9,6 +10,7 @@
     "build": "node scripts/build.ts",
     "start": "node scripts/build.ts && electron .",
     "package:mac": "node scripts/package-mac.ts",
+    "package:linux": "node scripts/package-linux.ts",
     "typecheck": "tsc --noEmit -p . && tsc --noEmit -p control",
     "test": "vitest run"
   },

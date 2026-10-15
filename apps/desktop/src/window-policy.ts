@@ -18,7 +18,7 @@ export const isOffeeUrl = (url: string): boolean => {
 
 /**
  * Whether the Offee window may load a URL at all. The page comes from inside the VM but runs
- * on the Mac, which has a network: without this, a compromised app could send data out with a
+ * on the host, which has a network: without this, a compromised app could send data out with a
  * plain fetch or image request, around the gateway. Its own CSP cannot be trusted for this,
  * since the same app serves it.
  * @param url The URL of any request the page makes.

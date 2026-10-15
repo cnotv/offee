@@ -3,13 +3,13 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Offee: a paperwork helper that keeps your documents on your Mac</title>
+    <title>Offee: a paperwork helper that keeps your documents on your computer</title>
     <meta name="description" content="Offee fills forms, drafts replies, translates and sums up meetings with an AI that runs on your own computer. Your documents never leave it unless you say so.">
     <link rel="canonical" href="https://cnotv.github.io/offee/">
     <link rel="icon" href="favicon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="style.css">
     <meta property="og:type" content="website">
-    <meta property="og:title" content="Offee: a paperwork helper that keeps your documents on your Mac">
+    <meta property="og:title" content="Offee: a paperwork helper that keeps your documents on your computer">
     <meta property="og:description" content="Fill forms, draft replies, translate and sum up meetings with an AI that runs on your own computer.">
     <meta property="og:url" content="https://cnotv.github.io/offee/">
     <meta property="og:image" content="https://cnotv.github.io/offee/og-image.png">
@@ -22,9 +22,9 @@
         "name": "Offee",
         "description": "An office assistant that runs on your own machine, sealed off from it: fills forms, drafts replies, translates and writes reviews with local models.",
         "applicationCategory": "BusinessApplication",
-        "operatingSystem": "macOS 13 or later on Apple Silicon",
+        "operatingSystem": "macOS 13 or later on Apple Silicon, Linux on x64 or arm64",
         "url": "https://cnotv.github.io/offee/",
-        "downloadUrl": "https://github.com/cnotv/offee/releases/tag/mac-preview",
+        "downloadUrl": "https://github.com/cnotv/offee/releases",
         "codeRepository": "https://github.com/cnotv/offee"
       }
     </script>
@@ -41,14 +41,15 @@
           <div>
             <h1>Your paperwork, done on your own computer.</h1>
             <p class="lead">
-              Offee fills in forms, drafts replies, translates letters and sums up meetings. The AI doing it runs on your Mac, so your passport scan, payslip or
+              Offee fills in forms, drafts replies, translates letters and sums up meetings. The AI doing it runs on your Mac or Linux PC, so your passport scan, payslip or
               contract never goes to someone else's server.
             </p>
             <div class="actions">
               <a class="button" href="https://github.com/cnotv/offee/releases/tag/mac-preview">Download the Mac preview</a>
+              <a class="button quiet" href="#linux">Get it for Linux</a>
               <a class="button quiet" href="#how">How it works</a>
             </div>
-            <p class="small">The source code is public. Needs a Mac with Apple Silicon and 16 GB of memory. An early test build.</p>
+            <p class="small">The source code is public. Needs a Mac with Apple Silicon or a Linux PC (x64 or arm64), and 16 GB of memory. An early test build.</p>
           </div>
           <figure class="window">
             <video id="demo" muted loop playsinline controls preload="metadata" width="1280" height="800" poster="media/offee-fill-a-form.png" aria-label="Offee reads a scanned personal data sheet into a profile, then fills a tenant form from that profile.">
@@ -80,11 +81,11 @@
               <label for="open">Open</label>
             </div>
             <div class="panel sealed">
-              <p><strong>Nothing leaves your computer.</strong> Every answer comes from the AI on your Mac. This is how Offee starts, every time.</p>
+              <p><strong>Nothing leaves your computer.</strong> Every answer comes from the AI on your computer. This is how Offee starts, every time.</p>
             </div>
             <div class="panel ask">
               <p>
-                <strong>Each request waits for you.</strong> When a task could use an online AI, your Mac shows exactly what would be sent. You say yes or no, one
+                <strong>Each request waits for you.</strong> When a task could use an online AI, Offee shows exactly what would be sent. You say yes or no, one
                 request at a time.
               </p>
             </div>
@@ -120,7 +121,7 @@
                 <tr>
                   <th scope="row">Where your documents go</th>
                   <td>To the company's servers, under its rules, sometimes used to train its next model.</td>
-                  <td>Nowhere. They stay on your Mac unless you let one request out.</td>
+                  <td>Nowhere. They stay on your computer unless you let one request out.</td>
                 </tr>
                 <tr>
                   <th scope="row">What it knows</th>
@@ -175,18 +176,26 @@
 
         <section id="get">
           <h2>Get it</h2>
+          <h3>On a Mac</h3>
           <ol class="steps">
             <li>Download <code>Offee-arm64.dmg</code> from the <a href="https://github.com/cnotv/offee/releases/tag/mac-preview">Mac preview release</a> and drag Offee to Applications.</li>
             <li>Open it and choose Set up Offee. It downloads the AI (about 10 GB) once, then opens. From then on it needs no internet.</li>
-            <li>Create a profile, or let Offee read one from a document, and try a form. Two made up documents to practise with are in <a href="https://github.com/cnotv/offee/tree/main/apps/web/public/samples">the samples folder</a>, and the app offers them with one click.</li>
           </ol>
+          <h3 id="linux">On Linux</h3>
+          <ol class="steps">
+            <li>Make sure virtualization is on (<code>/dev/kvm</code> exists), then install <a href="https://colima.run">Colima</a> and the Docker command line tools with Compose.</li>
+            <li>Download the package for your computer from the <a href="https://github.com/cnotv/offee/releases/tag/linux-preview">Linux preview release</a>: <code>Offee-linux-x64</code> for most PCs, <code>Offee-linux-arm64</code> for ARM ones.</li>
+            <li>On Debian or Ubuntu, install the <code>.deb</code> with <code>sudo apt install ./Offee-linux-x64.deb</code>. On other distributions, unpack the <code>.tar.gz</code> and follow the <a href="https://github.com/cnotv/offee#the-linux-app">README</a>.</li>
+            <li>Open Offee from your applications and choose Set up Offee. If your desktop shows no tray icon, open Offee again to bring its window back.</li>
+          </ol>
+          <p class="prose">Then create a profile, or let Offee read one from a document, and try a form. Two made up documents to practise with are in <a href="https://github.com/cnotv/offee/tree/main/apps/web/public/samples">the samples folder</a>, and the app offers them with one click.</p>
           <details class="extra">
             <summary>What gets installed, and how much space it takes</summary>
             <figure class="diagram">
               <div class="diagram-scroll"><img src="media/diagrams/installed.svg" width="960" height="460" loading="lazy" alt="On your Mac: the Offee app, plus Colima and the Docker command line tools that setup adds with Homebrew, and krunkit only with the GPU option. Inside the VM about 11 GB: the Gemma 4 E4B chat model 8.0 GB, the llama.cpp server 1.2 GB, whisper.cpp with ffmpeg 0.7 GB, the Whisper speech model 0.6 GB, the Offee app with OCR 0.5 GB and the edge web server 0.1 GB."></div>
             </figure>
           </details>
-          <p class="prose small">Prefer the terminal, or on Linux? The <a href="https://github.com/cnotv/offee#from-the-terminal">README</a> has the commands.</p>
+          <p class="prose small">Prefer the terminal? The <a href="https://github.com/cnotv/offee#from-the-terminal">README</a> has the commands.</p>
         </section>
       </main>
     </div>
