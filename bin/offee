@@ -25,6 +25,7 @@ keys_dir="$state_dir/keys"
 profile="offee"
 whisper_model_file="ggml-large-v3-turbo-q5_0.bin"
 whisper_model_url="https://huggingface.co/ggerganov/whisper.cpp/resolve/main/$whisper_model_file"
+loopback_hosts="localhost,127.0.0.1"
 default_chat_model="ggml-org/gemma-4-E4B-it-GGUF"
 small_chat_model="ggml-org/gemma-4-E2B-it-GGUF"
 # Images, both models, the build and the VM itself, with room to spare.
@@ -51,6 +52,8 @@ load_settings() {
   OFFEE_GPU="$(read_setting OFFEE_GPU 0)"
   OFFEE_PORT="$(read_setting OFFEE_PORT 8470)"
   runtime="${OFFEE_RUNTIME:-$(read_setting OFFEE_RUNTIME colima)}"
+  OFFEE_ALLOWED_HOSTS="$(read_setting OFFEE_ALLOWED_HOSTS "$loopback_hosts")"
+  export OFFEE_ALLOWED_HOSTS
   export OFFEE_CHAT_MODEL OFFEE_PORT
   export OFFEE_LLAMA_IMAGE="$llama_image" OFFEE_LLAMA_VULKAN_IMAGE="$llama_vulkan_image"
 }
@@ -546,6 +549,42 @@ command_destroy() {
   info "Deleted. Your keys and settings stay in $state_dir"
 }
 
+# Offee on a server, reached from your tailnet only. Tailscale serves it over HTTPS at the
+# server's tailnet name, to the devices your tailnet's access rules let in; Funnel would publish
+# it to the internet, so Offee refuses to be served while Funnel is on.
+tailscale_name() {
+  # The machine's own entry comes before its peers in the status, so the first name is its own.
+  { tailscale status --json 2>/dev/null || true; } | { grep -m1 -o '"DNSName": *"[^"]*"' || true; } | cut -d'"' -f4 | sed 's/\.$//'
+}
+
+command_tailscale() {
+  require_command tailscale || fail "Install Tailscale on this machine first: https://tailscale.com/download"
+  case "${1:-}" in
+    on)
+      local name
+      name="$(tailscale_name)"
+      [ -n "$name" ] || fail "Tailscale is not logged in here. Run: sudo tailscale up"
+      if tailscale serve status 2>/dev/null | grep -qi funnel; then
+        fail "Tailscale Funnel is on, which publishes to the internet. Turn it off first: tailscale funnel reset"
+      fi
+      save_setting OFFEE_ALLOWED_HOSTS "$loopback_hosts,$name"
+      OFFEE_ALLOWED_HOSTS="$loopback_hosts,$name"
+      compose up -d app
+      tailscale serve --bg --https=443 "http://127.0.0.1:$OFFEE_PORT" ||
+        fail "Tailscale would not serve Offee. If it needs root, allow this user once: sudo tailscale set --operator=\$USER"
+      bold "Offee is at https://$name for the devices on your tailnet"
+      ;;
+    off)
+      tailscale serve --https=443 off || true
+      save_setting OFFEE_ALLOWED_HOSTS "$loopback_hosts"
+      OFFEE_ALLOWED_HOSTS="$loopback_hosts"
+      compose up -d app
+      info "Offee is no longer served on the tailnet"
+      ;;
+    *) fail "Usage: offee tailscale on | off" ;;
+  esac
+}
+
 # Offee on a server of your own, driven over SSH. The server runs this same launcher, and Offee
 # there still publishes its port on the server's 127.0.0.1 only: the one way in is an SSH tunnel,
 # and the switch stays with whoever can log in to the server. The code goes to ~/offee there.
@@ -640,6 +679,8 @@ offee: an office assistant sealed in a VM on this machine
   offee update           rebuild after pulling a newer Offee
   offee selftest         prove the app reaches neither the internet nor your files
   offee destroy          delete the VM and all its data
+  offee tailscale on | off
+                         serve Offee over HTTPS to your tailnet only, never with Funnel
 
   offee remote <ssh-host> deploy [setup options]
                          copy this repository's last commit to a server and set it up there
@@ -668,6 +709,7 @@ case "${1:-help}" in
   update) command_update ;;
   selftest) command_selftest ;;
   destroy) command_destroy ;;
+  tailscale) shift; command_tailscale "$@" ;;
   remote) shift; command_remote "$@" ;;
   help|--help|-h) usage ;;
   *) usage; explained=1; exit 2 ;;

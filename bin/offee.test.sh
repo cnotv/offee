@@ -29,7 +29,25 @@ cat > "$work/bin/curl" <<'STUB'
 case "$*" in *192.0.2.1*) [ "${OFFEE_TEST_PUBLIC:-0}" = 1 ] && exit 0 ;; esac
 exit 7
 STUB
-printf '%s\n' '#!/bin/sh' 'exit 1' > "$work/bin/docker"
+# docker runs compose, as on a server that is set up, and nothing else: an engine that is down.
+cat > "$work/bin/docker" <<'STUB'
+#!/bin/sh
+case "$*" in *compose*) echo "docker $*" >> "$OFFEE_TEST_LOG"; exit 0 ;; esac
+exit 1
+STUB
+# tailscale records each call and reports a logged-in machine named box on its tailnet.
+# OFFEE_TEST_FUNNEL turns Funnel on; OFFEE_TEST_LOGGED_OUT makes it a machine not logged in.
+cat > "$work/bin/tailscale" <<'STUB'
+#!/bin/sh
+printf 'tailscale %s\n' "$*" >> "$OFFEE_TEST_LOG"
+case "$*" in
+  "status --json")
+    [ "${OFFEE_TEST_LOGGED_OUT:-0}" = 1 ] && exit 1
+    printf '{"BackendState": "Running", "Self": {"DNSName": "box.tail1.ts.net."}, "Peer": {"x": {"DNSName": "other.tail1.ts.net."}}}\n' ;;
+  "serve status")
+    [ "${OFFEE_TEST_FUNNEL:-0}" = 1 ] && printf '# Funnel on:\n#     - https://box.tail1.ts.net\n' ;;
+esac
+STUB
 chmod +x "$work/bin/"*
 
 export PATH="$work/bin:$PATH" OFFEE_TEST_LOG="$work/ssh.log" OFFEE_NO_BROWSER=1
@@ -101,6 +119,29 @@ expect "$work/out" "Docker engine does not answer" "a Docker engine that is down
 
 run setup --runtime podman
 expect "$work/out" "--runtime takes colima or docker" "an unknown runtime is refused"
+
+run tailscale on
+expect_status 0 "tailscale on succeeds on a logged-in machine"
+expect "$OFFEE_TEST_LOG" "tailscale serve --bg --https=443 http://127.0.0.1:8470" "Offee is served on the tailnet over HTTPS"
+expect "$work/home/settings.env" "OFFEE_ALLOWED_HOSTS=localhost,127.0.0.1,box.tail1.ts.net" "the app accepts the tailnet name"
+expect "$OFFEE_TEST_LOG" "up -d app" "the app restarts with the new name"
+expect "$work/out" "https://box.tail1.ts.net" "the address is shown"
+
+OFFEE_TEST_FUNNEL=1 run tailscale on
+expect_status 1 "tailscale on refuses while Funnel is on"
+expect "$work/out" "Funnel" "the Funnel problem is named"
+if grep -q "serve --bg" "$OFFEE_TEST_LOG"; then echo "FAIL  Offee was served while Funnel is on"; failures=$((failures + 1)); fi
+
+OFFEE_TEST_LOGGED_OUT=1 run tailscale on
+expect_status 1 "tailscale on refuses on a machine not logged in"
+expect "$work/out" "tailscale up" "it says how to log in"
+
+run tailscale off
+expect "$OFFEE_TEST_LOG" "tailscale serve --https=443 off" "tailscale off stops serving"
+expect "$work/home/settings.env" "OFFEE_ALLOWED_HOSTS=localhost,127.0.0.1" "tailscale off forgets the tailnet name"
+
+run remote box tailscale on
+expect "$OFFEE_TEST_LOG" "-t box OFFEE_NO_BROWSER=1 offee/bin/offee tailscale on" "tailscale on runs on the server"
 
 [ "$failures" -eq 0 ] || { echo "$failures check(s) failed"; exit 1; }
 echo "All launcher checks passed"
