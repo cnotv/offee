@@ -216,7 +216,8 @@ cd offee
 `setup` first checks the machine: the platform, memory, free disk space (25 GB), that port
 8470 is free and that the download sites answer. It also clears what an earlier attempt left
 behind, such as a stalled download or a VM that would not start, and picks a smaller model on
-a machine with less than 16 GB of memory. `offee check` runs the same check on its own. Then
+a machine with less than 16 GB of memory. It refuses `--memory`, `--cpus` or `--disk` values
+the model or the machine cannot honour. `offee check` runs the same check on its own. Then
 `setup` installs Colima and the Docker CLI if they are missing, creates the VM, builds the
 images and downloads the models (about 10 GB the first time), then opens Offee at
 <http://127.0.0.1:8470>. Downloads happen only during setup, before the app starts.
@@ -226,7 +227,7 @@ the same command.
 
 | Command | What it does |
 | --- | --- |
-| `offee setup [--gpu]` | First install. `--gpu` uses Colima's experimental `krunkit` VM type for the Mac's GPU |
+| `offee setup [--gpu]` | First install. `--gpu` uses Colima's experimental `krunkit` VM type for the Mac's GPU. `--runtime docker` skips the VM (see below) |
 | `offee start` / `stop` / `status` / `open` / `logs` | Run and inspect it |
 | `offee switch seal` / `ask` / `open 15` | What may leave the machine. Every start is sealed |
 | `offee watch` | Approve or deny requests waiting in ask mode, seeing exactly what would be sent |
@@ -235,10 +236,84 @@ the same command.
 | `offee selftest` | Prove the app reaches neither the internet nor the host |
 | `offee update` | Start the VM and rebuild after `git pull` |
 | `offee destroy` | Delete the VM and everything in it |
+| `offee tailscale on` / `off` | Serve Offee over HTTPS to your tailnet only (see below) |
 
 Start with a profile and a persona, add a few documents to the library, then try each workflow.
 To let a persona use Claude: set it to "Remote when the switch allows", run `offee key anthropic`,
 then `offee switch ask` and `offee watch` in a second terminal.
+
+### On a server of your own
+
+For people who already run servers: a home server, or one machine in a small company. Offee
+then runs on the server and you reach it from your laptop. It is not built to be put on the
+internet, and this does not make it so:
+
+- **A private network or a tunnel is the only way in.** Offee on the server listens on the
+  server's `127.0.0.1` only. You reach it through [Tailscale](https://tailscale.com), or an SSH
+  tunnel as the fallback; no public port is opened for Offee, and there is no login page to put
+  in front of it. After a deploy the launcher checks from your laptop that the server's address
+  does not answer on Offee's port, and fails if it does.
+- **There are no user accounts.** Everyone who can reach it, through the tailnet or by logging
+  in over SSH, sees every profile and document and can turn the switch. One server per person,
+  or per group that already shares everything.
+- **Your documents live on the server**, in its VM, protected by the server's disk encryption,
+  not your Mac's.
+
+The server needs Linux with virtualization (`/dev/kvm`), Colima and the Docker CLI with Compose,
+16 GB of memory (8 GB runs a smaller model) and 25 GB of free disk. You need SSH access to it, set
+up as for any other host (a `Host` entry in `~/.ssh/config` works). From a clone of this
+repository:
+
+```sh
+./bin/offee remote me@server deploy
+```
+
+`deploy` copies this repository's last commit to `~/offee` on the server and runs `setup` there
+(`update` once set up), so the machine check runs on the server and stops before downloading
+anything if it falls short. Setup options pass through: `deploy --memory 24 --cpus 8`.
+
+#### Reach it through Tailscale (recommended)
+
+Put the server and your laptop on the same tailnet (`sudo tailscale up` on the server), then:
+
+```sh
+./bin/offee remote me@server tailscale on
+```
+
+Offee is then at `https://<server>.<tailnet>.ts.net`, over HTTPS, for the devices your tailnet's
+access rules let in, and for nobody else. The server can close every inbound port, SSH included:
+deploy and run the commands over the tailnet name instead (`offee remote me@server.<tailnet>.ts.net
+deploy`). `tailscale on` refuses while [Funnel](https://tailscale.com/kb/1223/funnel) is on, since
+Funnel publishes to the internet. `tailscale off` stops serving.
+
+Tailscale's coordination server learns which devices you have and when they connect; it never
+sees the traffic, which is end to end encrypted. To keep even that in house, run
+[Headscale](https://headscale.net) as your own coordination server.
+
+#### Reach it through an SSH tunnel (fallback)
+
+```sh
+./bin/offee remote me@server tunnel
+```
+
+`tunnel` forwards <http://127.0.0.1:8470> on your laptop to Offee on the server and opens it;
+`--port 8471` picks another local port, for example when Offee also runs on your laptop. The
+tunnel binds loopback on both ends, so nothing else on your network can use it.
+
+Offee itself stays hidden, but the server's SSH port has to be reachable from your laptop, and
+on the internet bots try it all day. Harden it: key logins only (`PasswordAuthentication no`),
+no root login (`PermitRootLogin no`), and fail2ban or a firewall that lets in only your own
+addresses.
+
+#### Running it
+
+Every other command runs on the server: `offee remote me@server switch ask`, `watch`,
+`key anthropic`, `status`, `logs`, `selftest`, `destroy`. The switch and the API key stay on
+the server, with whoever can log in to it.
+
+A server without `/dev/kvm`, such as most cloud VMs, can run `deploy --runtime docker`. That
+drops the VM: Offee is then isolated by its containers only, and the server's own Docker engine
+is the boundary. Use it only on a server that runs nothing else.
 
 ### What this first build does not do yet
 

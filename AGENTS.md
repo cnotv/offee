@@ -128,7 +128,7 @@ hand is an MP4, never a GIF.
   `/api` proxied); the full app runs with `./bin/offee setup`
 - **Routes:** `/chat` (default), `/reply`, `/translate`, `/review`, `/forms`, `/library`,
   `/profiles`, `/personas`, `/runs`, `/data`
-- **Checks:** `pnpm lint --max-warnings 0`, `pnpm typecheck`, `pnpm test`, `shellcheck bin/offee`
+- **Checks:** `pnpm lint --max-warnings 0`, `pnpm typecheck`, `pnpm test`, `shellcheck bin/offee bin/offee.test.sh`, `bash bin/offee.test.sh`
 - **Mac app:** `pnpm --filter @offee/desktop start` runs it; the `Mac app` workflow packages
   `Offee-arm64.dmg` on macOS and publishes it as the `mac-preview` pre-release
 - **Docs home:** `README.md`

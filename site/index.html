@@ -198,6 +198,24 @@
           </details>
           <p class="prose small">Prefer the terminal? The <a href="https://github.com/cnotv/offee#from-the-terminal">README</a> has the commands.</p>
         </section>
+
+        <section id="server">
+          <h2>On a server of your own</h2>
+          <div class="prose">
+            <p class="small">For people who already run servers, at home or in a small company. If you use Offee on one computer, you can skip this.</p>
+            <p>Offee can run on a Linux server you control, and you reach it from your laptop. It is not built to be put on the internet, and running it on a server does not change that:</p>
+            <ul>
+              <li><strong>A private network is the only way in.</strong> Offee on the server answers only the server itself. You reach it through <a href="https://tailscale.com">Tailscale</a>, a private network between your own devices, or through an SSH tunnel if you do not use Tailscale. No port is opened for Offee, and there is no login page, so nobody outside can get to it.</li>
+              <li><strong>There are no user accounts.</strong> Everyone you let onto that private network, or who can log in to the server, sees every profile and document and can turn the switch. Use one server per person, or per group that already shares everything.</li>
+              <li><strong>Your documents live on the server</strong>, protected by the server's disk encryption, not your own computer's.</li>
+            </ul>
+            <p>The server needs Linux with virtualization, Colima and Docker, 16 GB of memory and 25 GB of free disk. From a copy of the source code on your laptop:</p>
+            <pre><code>./bin/offee remote me@server deploy
+./bin/offee remote me@server tailscale on</code></pre>
+            <p>The first command checks the server and stops before downloading anything if it falls short, then sets Offee up there and makes sure it does not answer on the server's own address. The second makes Offee available over HTTPS to the devices on your Tailscale network, and refuses while Tailscale Funnel, which would publish it to the internet, is on. Without Tailscale, <code>./bin/offee remote me@server tunnel</code> opens it through SSH instead.</p>
+            <p>Tailscale's coordination service learns which of your devices exist and when they connect, but never sees what they send. The <a href="https://github.com/cnotv/offee#on-a-server-of-your-own">README</a> has the details, including how to harden SSH and how to keep even that in house.</p>
+          </div>
+        </section>
       </main>
     </div>
 
