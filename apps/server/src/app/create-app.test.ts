@@ -8,6 +8,7 @@ import { createDocumentStore } from '../store/document-store.ts'
 import { createFileStore } from '../store/file-store.ts'
 import { createPersonaStore, createProfileStore } from '../store/profile-store.ts'
 import { createRunStore } from '../store/run-store.ts'
+import { createStoredData } from '../store/stored-data.ts'
 import { createWorkflows } from '../workflows/workflows.ts'
 import { createApp } from './create-app.ts'
 
@@ -51,10 +52,12 @@ const setUp = (remoteOutcome: Awaited<ReturnType<RemoteModel['complete']>>, loca
     runs: createRunStore(database, now),
     files: createFileStore(database, now),
   }
+  const storedData = createStoredData(database)
   const reviewTemplates = [{ id: 'meeting', name: 'Meeting', sections: ['Summary'] }]
   const workflows = createWorkflows({ ...stores, models: { local: localModel, remote, now }, transcriber, reviewTemplates, fieldAliases: {}, now })
   const app = createApp({
     ...stores,
+    storedData,
     workflows,
     localModel,
     transcriber,
@@ -255,6 +258,54 @@ describe('stopping an operation', () => {
     expect(localRequests[0]?.signal.aborted).toBe(false)
     controller.abort()
     expect(localRequests[0]?.signal.aborted).toBe(true)
+  })
+})
+
+const storedItemsSchema = z.array(z.object({ kind: z.string(), id: z.string(), title: z.string(), bytes: z.number() }))
+
+describe('stored data', () => {
+  const fillEverything = async () => {
+    const context = setUp({ ok: false, reason: 'unused', reachedProvider: false })
+    const upload = new FormData()
+    upload.set('file', new File(['The office closes at 18:00 on Fridays.'], 'hours.txt', { type: 'text/plain' }))
+    await context.request('/api/documents', { method: 'POST', body: upload })
+    await context.postJson('/api/profiles', { ...emptyProfile, label: 'Work' })
+    await context.postJson('/api/personas', { name: 'Helper', instructions: 'Be brief.', modelPreference: 'local' })
+    await context.postJson('/api/chat', { profileId: null, personaId: null, conversationId: firstConversation, history: [], message: 'When do we close?' })
+    context.stores.files.put({ name: 'form.pdf', mimeType: 'application/pdf', content: new Uint8Array(10) })
+    const items = await parse(await context.request('/api/stored-data'), storedItemsSchema)
+    return { ...context, items }
+  }
+
+  it('lists every kind of item Offee keeps, with its size', async () => {
+    const { items } = await fillEverything()
+    expect(items.map((item) => item.kind).toSorted()).toEqual(['document', 'file', 'persona', 'profile', 'run'])
+    expect(items.find((item) => item.kind === 'file')).toMatchObject({ title: 'form.pdf', bytes: 10 })
+    expect(items.find((item) => item.kind === 'document')?.title).toBe('hours.txt')
+    expect(items.every((item) => item.bytes > 0)).toBe(true)
+  })
+
+  it('deletes one item, and its document passages with it', async () => {
+    const { request, postJson, items } = await fillEverything()
+    const document = items.find((item) => item.kind === 'document')
+    expect((await request(`/api/stored-data/document/${document?.id}`, { method: 'DELETE' })).status).toBe(204)
+    expect((await request(`/api/stored-data/document/${document?.id}`, { method: 'DELETE' })).status).toBe(404)
+
+    const left = await parse(await request('/api/stored-data'), storedItemsSchema)
+    expect(left.map((item) => item.kind)).not.toContain('document')
+    const answer = await parse(await postJson('/api/chat', { profileId: null, personaId: null, conversationId: secondConversation, history: [], message: 'When does the office close?' }), answerSchema)
+    expect(answer.citations).toEqual([])
+  })
+
+  it('refuses a kind it does not keep', async () => {
+    const { request } = await fillEverything()
+    expect((await request('/api/stored-data/secrets/1', { method: 'DELETE' })).status).toBe(400)
+  })
+
+  it('deletes everything at once', async () => {
+    const { request } = await fillEverything()
+    expect((await request('/api/stored-data', { method: 'DELETE' })).status).toBe(204)
+    expect(await parse(await request('/api/stored-data'), storedItemsSchema)).toEqual([])
   })
 })
 
