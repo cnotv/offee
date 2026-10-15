@@ -1,6 +1,8 @@
 import mammoth from 'mammoth'
 import PostalMime from 'postal-mime'
 import { extractText as extractPdfText, getDocumentProxy } from 'unpdf'
+import type { ReadScan } from './read-scan.ts'
+import { readScanWithTesseract } from './read-scan.ts'
 
 export type ExtractedText = {
   text: string
@@ -26,6 +28,11 @@ export const resolveMimeType = (fileName: string, declaredType: string): string 
     txt: 'text/plain',
     csv: 'text/csv',
     json: 'application/json',
+    png: 'image/png',
+    jpg: 'image/jpeg',
+    jpeg: 'image/jpeg',
+    tif: 'image/tiff',
+    tiff: 'image/tiff',
   }
   return byExtension[extension] ?? (declaredType === '' ? 'application/octet-stream' : declaredType)
 }
@@ -44,21 +51,32 @@ const extractEmail = async (content: Uint8Array): Promise<string> => {
   return `${header}\n\n${(email.text ?? '').trim()}`
 }
 
+const scannedImageTypes = new Set(['image/png', 'image/jpeg', 'image/tiff'])
+
 /**
- * Reads the text out of an uploaded file. PDF, DOCX and email are parsed; anything else
- * must be text.
+ * Reads the text out of an uploaded file. PDF, DOCX and email are parsed, a scanned PDF and a
+ * photo of a page are read with OCR; anything else must be text.
  * @param fileName The file's name.
  * @param declaredType The type the browser declared.
  * @param content The file's bytes.
+ * @param readScan Reads a scan's text; Tesseract unless a test replaces it.
  * @returns The text and the type it was read as; throws for a kind it cannot read.
  */
-export const extractText = async (fileName: string, declaredType: string, content: Uint8Array): Promise<ExtractedText> => {
+export const extractText = async (
+  fileName: string,
+  declaredType: string,
+  content: Uint8Array,
+  readScan: ReadScan = readScanWithTesseract,
+): Promise<ExtractedText> => {
   const mimeType = resolveMimeType(fileName, declaredType)
   if (mimeType === 'application/pdf') {
     const pdf = await getDocumentProxy(new Uint8Array(content))
     const { text } = await extractPdfText(pdf, { mergePages: true })
-    return { text: text.trim(), mimeType }
+    // A scan is pictures of pages with no text layer.
+    if (text.trim() !== '') return { text: text.trim(), mimeType }
+    return { text: (await readScan('pdf', content)).trim(), mimeType }
   }
+  if (scannedImageTypes.has(mimeType)) return { text: (await readScan('image', content)).trim(), mimeType }
   if (mimeType === docxMimeType) {
     const { value } = await mammoth.extractRawText({ buffer: Buffer.from(content) })
     return { text: value.trim(), mimeType }
@@ -67,5 +85,5 @@ export const extractText = async (fileName: string, declaredType: string, conten
   if (mimeType.startsWith('text/') || mimeType === 'application/json' || mimeType === 'application/mbox') {
     return { text: new TextDecoder().decode(content).trim(), mimeType }
   }
-  throw new Error(`Offee cannot read ${fileName} yet: use PDF, DOCX, EML, or a text file`)
+  throw new Error(`Offee cannot read ${fileName} yet: use PDF, DOCX, EML, a photo or scan (PNG, JPEG, TIFF), or a text file`)
 }

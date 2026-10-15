@@ -1,12 +1,14 @@
 import { PlusIcon, TrashIcon } from '@radix-ui/react-icons'
 import { AlertDialog, Badge, Box, Button, Callout, Card, Dialog, Flex, Grid, Heading, Text, TextArea, TextField } from '@radix-ui/themes'
 import { useState } from 'react'
-import type { Profile, ProfileInput } from '@offee/contracts'
+import type { Profile, ProfileInput, ProfileReading } from '@offee/contracts'
 import { ErrorCallout } from '@/components/ErrorCallout'
 import { FilePickerButton } from '@/components/FilePickerButton'
+import { ModelBadge } from '@/components/WorkflowResultCard'
 import { useAction } from '@/hooks/useAction'
 import { useDirectory } from '@/hooks/useDirectory'
 import { api } from '@/lib/api'
+import { mergeProfileDetails } from '@/lib/merge-profile-details'
 
 const emptyProfile: ProfileInput = {
   label: '',
@@ -78,7 +80,9 @@ type ProfileDialogProps = {
 
 const ProfileDialog = ({ profile, open, onOpenChange, onSaved }: ProfileDialogProps) => {
   const [draft, setDraft] = useState<ProfileInput>(profile === null ? emptyProfile : toInput(profile))
+  const [reading, setReading] = useState<ProfileReading | null>(null)
   const action = useAction()
+  const documentReading = useAction()
   const set = <Key extends keyof ProfileInput>(key: Key, value: ProfileInput[Key]) => setDraft((current) => ({ ...current, [key]: value }))
 
   return (
@@ -89,6 +93,35 @@ const ProfileDialog = ({ profile, open, onOpenChange, onSaved }: ProfileDialogPr
           An identity you act as. Its details fill forms; its tone and facts shape what Offee writes for it.
         </Dialog.Description>
         <Flex direction="column" gap="3">
+          <Flex gap="2" align="center" wrap="wrap">
+            <FilePickerButton
+              accept=".pdf,.docx,.txt,.png,.jpg,.jpeg,.tif,.tiff"
+              disabled={documentReading.busy}
+              onPick={(file) =>
+                documentReading.run(async () => {
+                  const read = await api.readProfileDocument(file)
+                  setDraft((current) => mergeProfileDetails(current, read.details))
+                  setReading(read)
+                })
+              }
+            >
+              Read from a document
+            </FilePickerButton>
+            <Text size="1" color="gray">
+              {documentReading.busy ? 'Reading the document on this machine…' : 'An ID, a CV or a scan: the local model fills in what it says.'}
+            </Text>
+          </Flex>
+          <ErrorCallout error={documentReading.error} />
+          {reading !== null && (
+            <Callout.Root color="grass" variant="surface">
+              <Callout.Text>
+                <Flex gap="2" align="center" wrap="wrap">
+                  <Text>Read from {reading.fileName}. Check every value, then save.</Text>
+                  <ModelBadge model={reading.model} />
+                </Flex>
+              </Callout.Text>
+            </Callout.Root>
+          )}
           <Grid columns={{ initial: '1', sm: '2' }} gap="3">
             {textFields.map((field) => (
               <Flex key={field.key} direction="column" gap="1">

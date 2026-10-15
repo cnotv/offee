@@ -100,6 +100,17 @@ export const createApp = (dependencies: AppDependencies): Hono => {
     if (!input.ok) return context.json({ error: input.error }, 400)
     return dependencies.profiles.update(context.req.param('id'), input.data) ? context.json(dependencies.profiles.get(context.req.param('id'))) : context.notFound()
   })
+  app.post('/api/profiles/read-document', uploadLimit, async (context) => {
+    const upload = await readUpload(context)
+    if (upload === null) return context.json({ error: 'Send the document as a "file" field' }, 400)
+    try {
+      const extracted = await extractText(upload.file.name, upload.file.type, new Uint8Array(await upload.file.arrayBuffer()))
+      if (extracted.text === '') return context.json({ error: `No text found in ${upload.file.name}, even with OCR.` }, 422)
+      return context.json(await dependencies.workflows.readProfileDocument({ name: upload.file.name, text: extracted.text }))
+    } catch (error) {
+      return context.json({ error: describeError(error) }, 422)
+    }
+  })
   app.delete('/api/profiles/:id', (context) => (dependencies.profiles.remove(context.req.param('id')) ? context.body(null, 204) : context.notFound()))
 
   app.get('/api/personas', (context) => context.json(dependencies.personas.list()))
@@ -120,7 +131,7 @@ export const createApp = (dependencies: AppDependencies): Hono => {
     if (upload === null) return context.json({ error: 'Send the document as a "file" field' }, 400)
     try {
       const extracted = await extractText(upload.file.name, upload.file.type, new Uint8Array(await upload.file.arrayBuffer()))
-      if (extracted.text === '') return context.json({ error: `No text found in ${upload.file.name}. Scanned pages need OCR, which is not in this build yet.` }, 422)
+      if (extracted.text === '') return context.json({ error: `No text found in ${upload.file.name}. Offee read it with OCR too and found nothing.` }, 422)
       const summary = dependencies.documents.add({
         title: upload.file.name,
         mimeType: extracted.mimeType,

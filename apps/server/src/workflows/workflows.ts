@@ -3,6 +3,7 @@ import type {
   FormFillRequest,
   FormFillResult,
   FormInspection,
+  ProfileReading,
   ReplyRequest,
   ReviewRequest,
   ReviewTemplate,
@@ -25,7 +26,9 @@ import type { PersonaStore, ProfileStore } from '../store/profile-store.ts'
 import type { RunStore } from '../store/run-store.ts'
 import type { Transcriber } from '../transcription/transcriber.ts'
 import { suggestionsFromModelAnswer, formSchemaFor } from './form-answer.ts'
-import { chatTask, condenseTask, formTask, knowledgeBlock, replyTask, reviewTask, systemPrompt, translateTask } from './prompts.ts'
+import { inSequence } from './in-sequence.ts'
+import { profileDetailsFromModelAnswer, profileDetailsSchema } from './profile-details.ts'
+import { chatTask, condenseTask, formTask, knowledgeBlock, profileDetailsTask, replyTask, reviewTask, systemPrompt, translateTask } from './prompts.ts'
 
 export type WorkflowDependencies = {
   profiles: ProfileStore
@@ -46,16 +49,8 @@ const docxMimeType = 'application/vnd.openxmlformats-officedocument.wordprocessi
 const translationChunkLength = 3000
 const reviewDirectLimit = 24_000
 const condenseChunkLength = 12_000
-
-/**
- * Runs promise-returning steps one after another, never in parallel: a local model serves one
- * request at a time anyway.
- * @param items The inputs.
- * @param step The work for one input.
- * @returns The results, in order.
- */
-export const inSequence = <Input, Output>(items: Input[], step: (item: Input) => Promise<Output>): Promise<Output[]> =>
-  items.reduce<Promise<Output[]>>(async (previous, item) => [...(await previous), await step(item)], Promise.resolve([]))
+// A document about a person states the details early; the rest would only crowd the context.
+const profileDocumentLimit = 24_000
 
 const combine = (generations: Generation[]): Pick<Generation, 'model' | 'outbound'> => ({
   model: generations.at(-1)?.model ?? { kind: 'local', name: 'local model', fallbackReason: null },
@@ -198,13 +193,14 @@ export const createWorkflows = (dependencies: WorkflowDependencies) => {
       )
       if (profile === undefined || unanswered.length === 0) return { formFileId, fileName: upload.name, fields, suggestions: fromProfile, model: null }
 
+      const citations = dependencies.documents.search(unanswered.map((field) => field.name).join(' '), context)
       const generation = await generate(dependencies.models, {
         persona,
         system: systemPrompt(persona, profile, formTask),
         messages: [
           {
             role: 'user',
-            content: `Today is ${today}. Fields to fill:\n${JSON.stringify(unanswered.map((field) => ({ name: field.name, kind: field.kind, options: field.options })))}`,
+            content: `${knowledgeBlock(citations)}\n\nToday is ${today}. Fields to fill:\n${JSON.stringify(unanswered.map((field) => ({ name: field.name, kind: field.kind, options: field.options })))}`,
           },
         ],
         maxTokens: 2048,
@@ -220,6 +216,28 @@ export const createWorkflows = (dependencies: WorkflowDependencies) => {
         outbound: generation.outbound,
       })
       return { formFileId, fileName: upload.name, fields, suggestions, model: generation.model }
+    },
+
+    // Always the local model, whatever the persona allows: a document about a person stays here.
+    readProfileDocument: async (document: { name: string; text: string }): Promise<ProfileReading> => {
+      const generation = await generate(dependencies.models, {
+        persona: undefined,
+        system: systemPrompt(undefined, undefined, profileDetailsTask),
+        messages: [{ role: 'user', content: `<document>\n${document.text.slice(0, profileDocumentLimit)}\n</document>` }],
+        maxTokens: 2048,
+        jsonSchema: profileDetailsSchema(),
+      })
+      const runId = dependencies.runs.record({
+        workflow: 'profile',
+        title: `Profile details from ${document.name}`,
+        model: generation.model,
+        input: document.text,
+        output: generation.text,
+        outbound: generation.outbound,
+      })
+      const details = profileDetailsFromModelAnswer(generation.text)
+      if (details === null) throw new Error(`No details about a person found in ${document.name}`)
+      return { runId, fileName: document.name, details, model: generation.model }
     },
 
     fillForm: async (request: FormFillRequest): Promise<FormFillResult> => {

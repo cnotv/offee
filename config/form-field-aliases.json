@@ -150,5 +150,21 @@
     "luogoedata",
     "lieu",
     "lugar"
+  ],
+  "dateOrPlaceOfBirth": [
+    "dateofbirth",
+    "birthdate",
+    "placeofbirth",
+    "birthplace",
+    "countryofbirth",
+    "geburtsdatum",
+    "geburtsort",
+    "geburtsland",
+    "datadinascita",
+    "luogodinascita",
+    "datedenaissance",
+    "lieudenaissance",
+    "fechadenacimiento",
+    "lugardenacimiento"
   ]
 }

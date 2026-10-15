@@ -65,6 +65,7 @@ describe('continuing a run from the log', () => {
 
   it('has nothing to continue for a filled form', () => {
     expect(canContinue('form')).toBe(false)
+    expect(canContinue('profile')).toBe(false)
     expect(continuationOf([run({ workflow: 'form' })], empty)).toBeNull()
   })
 })

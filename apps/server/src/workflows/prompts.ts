@@ -86,4 +86,9 @@ export const condenseTask =
   'Condense this part of a longer text into detailed notes: keep every claim, number, name, decision and open question. Output only the notes.'
 
 export const formTask =
-  'Fill in form fields for the person. For each field, give the value from the facts you have, or an empty string when you do not know it. Never invent personal data. Answer with JSON only.'
+  'Fill in form fields for the person. For each field, give the value from the facts you have or from the passages of their documents, or an empty string when neither says. Never invent personal data. Answer with JSON only.'
+
+export const profileDetailsTask =
+  'Pick out the details about the person this document describes. Copy each value exactly as the document writes it, and leave a field empty when the document does not give it. ' +
+  'Put every other personal detail it gives, such as date and place of birth, nationality, ID or passport number, tax number, employer or income, into "facts", one per line as "Label: value". ' +
+  'Never invent anything. Answer with JSON only.'

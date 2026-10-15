@@ -53,6 +53,7 @@ export const continuationOf = (conversation: RunDetail[], empty: WorkflowPages):
     case 'transcribe':
       return { page: 'review', state: { templateId: empty.review.templateId, source: run.output, result: null } }
     case 'form':
+    case 'profile':
       return null
   }
 }
@@ -60,6 +61,6 @@ export const continuationOf = (conversation: RunDetail[], empty: WorkflowPages):
 /**
  * Whether a run can be continued, before loading it.
  * @param workflow The run's workflow.
- * @returns True for every workflow but forms.
+ * @returns True for every workflow but forms and reading a profile from a document.
  */
-export const canContinue = (workflow: RunDetail['workflow']): boolean => workflow !== 'form'
+export const canContinue = (workflow: RunDetail['workflow']): boolean => workflow !== 'form' && workflow !== 'profile'

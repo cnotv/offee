@@ -48,7 +48,7 @@ export const outboundRecordSchema = z.object({
   detail: z.string(),
 })
 
-export const workflowKindSchema = z.enum(['chat', 'reply', 'translate', 'review', 'transcribe', 'form'])
+export const workflowKindSchema = z.enum(['chat', 'reply', 'translate', 'review', 'transcribe', 'form', 'profile'])
 
 export const workflowContextSchema = z.object({
   profileId: z.string().nullable(),

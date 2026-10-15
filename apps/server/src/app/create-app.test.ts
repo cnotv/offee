@@ -1,3 +1,4 @@
+import { PDFDocument } from 'pdf-lib'
 import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
 import type { RemoteModel, RemoteRequest } from '../llm/remote-model.ts'
@@ -23,7 +24,7 @@ const runSchema = z.object({ leftMachine: z.boolean(), outbound: z.array(z.unkno
 
 const parse = async <Output>(response: Response, schema: z.ZodType<Output>): Promise<Output> => schema.parse(await response.json())
 
-const setUp = (remoteOutcome: Awaited<ReturnType<RemoteModel['complete']>>) => {
+const setUp = (remoteOutcome: Awaited<ReturnType<RemoteModel['complete']>>, localAnswer = 'Local answer [1]') => {
   const database = openDatabase(':memory:')
   const now = () => 1_000
   const localRequests: CompletionRequest[] = []
@@ -31,7 +32,7 @@ const setUp = (remoteOutcome: Awaited<ReturnType<RemoteModel['complete']>>) => {
   const localModel: LocalModel = {
     complete: async (request) => {
       localRequests.push(request)
-      return 'Local answer [1]'
+      return localAnswer
     },
     name: async () => 'gemma-test',
   }
@@ -69,7 +70,25 @@ const setUp = (remoteOutcome: Awaited<ReturnType<RemoteModel['complete']>>) => {
   return { request, postJson, localRequests, remoteRequests, stores }
 }
 
-const firstConversation = '0f8fad5b-d9cb-469f-a165-70867728950e'
+const emptyProfile = {
+  label: '',
+  firstName: '',
+  lastName: '',
+  role: '',
+  organization: '',
+  email: '',
+  phone: '',
+  street: '',
+  postalCode: '',
+  city: '',
+  country: '',
+  languages: [],
+  tone: '',
+  facts: '',
+  signatureImage: null,
+}
+
+const firstConversation ='0f8fad5b-d9cb-469f-a165-70867728950e'
 const secondConversation = '7c9e6679-7425-40de-944b-e07fc1f90ae7'
 
 describe('the request guard', () => {
@@ -149,6 +168,64 @@ describe('remote personas', () => {
     const answer = await parse(await postJson('/api/chat', { profileId: null, personaId: persona.id, conversationId: firstConversation, history: [], message: 'Hello there' }), answerSchema)
     expect(answer.text).toBe('Remote answer')
     expect(answer.model.kind).toBe('remote')
+  })
+})
+
+describe('reading a document into a profile', () => {
+  it('asks only the local model for the details, returns them to check and logs the run', async () => {
+    const modelAnswer = 'Here you go: {"firstName":"Erika","lastName":"Mustermann","city":"Berlin","languages":["German"],"facts":"Date of birth: 12.08.1990"}'
+    const { request, postJson, localRequests, remoteRequests } = setUp({ ok: true, text: 'unused', model: 'claude-opus-5-5' }, modelAnswer)
+    await postJson('/api/personas', { name: 'Remote', instructions: '', modelPreference: 'remote' })
+    const upload = new FormData()
+    upload.set('file', new File(['Name: Erika Mustermann\nBorn 12.08.1990 in Berlin'], 'data-sheet.txt', { type: 'text/plain' }))
+    const response = await request('/api/profiles/read-document', { method: 'POST', body: upload })
+    const reading = await parse(response, z.object({ runId: z.string(), fileName: z.string(), details: z.record(z.string(), z.unknown()) }))
+
+    expect(reading.fileName).toBe('data-sheet.txt')
+    expect(reading.details).toEqual({
+      firstName: 'Erika',
+      lastName: 'Mustermann',
+      role: '',
+      organization: '',
+      email: '',
+      phone: '',
+      street: '',
+      postalCode: '',
+      city: 'Berlin',
+      country: '',
+      languages: ['German'],
+      facts: 'Date of birth: 12.08.1990',
+    })
+    expect(remoteRequests).toHaveLength(0)
+    expect(localRequests[0]?.messages.at(-1)?.content).toContain('Born 12.08.1990 in Berlin')
+    const run = await parse(await request(`/api/runs/${reading.runId}`), z.object({ workflow: z.string(), leftMachine: z.boolean() }))
+    expect(run).toEqual(expect.objectContaining({ workflow: 'profile', leftMachine: false }))
+  })
+
+  it('says so when the model gives nothing it can read', async () => {
+    const { request } = setUp({ ok: false, reason: '', reachedProvider: false }, 'I cannot help with that')
+    const upload = new FormData()
+    upload.set('file', new File(['Nothing about a person'], 'note.txt', { type: 'text/plain' }))
+    expect((await request('/api/profiles/read-document', { method: 'POST', body: upload })).status).toBe(422)
+  })
+})
+
+describe('form suggestions', () => {
+  it('give the model the passages of the profile’s documents', async () => {
+    const { request, postJson, localRequests } = setUp({ ok: false, reason: '', reachedProvider: false })
+    const profile = await parse(await postJson('/api/profiles', { ...emptyProfile, label: 'Erika' }), idSchema)
+    const document = new FormData()
+    document.set('file', new File(['Date of birth: 12.08.1990. Nationality: German.'], 'data-sheet.txt', { type: 'text/plain' }))
+    document.set('profileId', profile.id)
+    await request('/api/documents', { method: 'POST', body: document })
+
+    const pdf = await PDFDocument.create()
+    pdf.getForm().createTextField('Date of birth').addToPage(pdf.addPage([600, 400]), { x: 50, y: 300, width: 200, height: 20 })
+    const form = new FormData()
+    form.set('file', new File([await pdf.save()], 'application.pdf', { type: 'application/pdf' }))
+    form.set('profileId', profile.id)
+    expect((await request('/api/forms/inspect', { method: 'POST', body: form })).status).toBe(200)
+    expect(localRequests[0]?.messages.at(-1)?.content).toContain('Date of birth: 12.08.1990')
   })
 })
 

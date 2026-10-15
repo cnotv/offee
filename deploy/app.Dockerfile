@@ -25,6 +25,11 @@ ENV NODE_ENV=production \
     OFFEE_WEB_DIST=/app/apps/web/dist \
     OFFEE_GATEWAY_DESTINATIONS=/app/config/gateway-destinations.json
 
+# OCR for scans and photos: Tesseract 5.5 with its English, German and Italian data (Apache 2.0),
+# and pdftoppm to turn PDF pages into images. Alpine's signed packages, installed while the image
+# builds; nothing is downloaded at run time.
+RUN apk add --no-cache tesseract-ocr~5.5 tesseract-ocr-data-eng~5.5 tesseract-ocr-data-deu~5.5 tesseract-ocr-data-ita~5.5 poppler-utils
+
 COPY --from=build /app/package.json ./
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/config ./config
