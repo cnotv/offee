@@ -14,9 +14,23 @@ export type CompletionRequest = {
   signal: AbortSignal
 }
 
-const completionSchema = z.object({
-  choices: z.array(z.object({ message: z.object({ content: z.string().nullable() }) })).min(1),
+const streamEventSchema = z.object({
+  choices: z.array(z.object({ delta: z.object({ content: z.string().nullish() }) })),
 })
+
+/**
+ * Puts a streamed answer back together from llama.cpp's server-sent events.
+ * @param events The response body: `data:` lines, each a piece of the answer, then `data: [DONE]`.
+ * @returns The answer's text.
+ */
+export const textOfStream = (events: string): string =>
+  events
+    .split('\n')
+    .filter((line) => line.startsWith('data:'))
+    .map((line) => line.slice('data:'.length).trim())
+    .filter((data) => data !== '[DONE]')
+    .map((data) => streamEventSchema.parse(JSON.parse(data)).choices[0]?.delta.content ?? '')
+    .join('')
 
 const modelListSchema = z.object({ data: z.array(z.object({ id: z.string() })) })
 
@@ -51,6 +65,9 @@ export const createLocalModel = (baseUrl: string, fetchFunction: typeof fetch = 
       body: JSON.stringify({
         messages: request.messages,
         max_tokens: request.maxTokens,
+        // Streamed, the headers come at once: fetch drops a response whose headers take more than
+        // five minutes, and a long answer on a slow machine takes longer than that to write.
+        stream: true,
         // An answer that must fit a schema is data read off a document: the likeliest reading, every time.
         temperature: request.jsonSchema === undefined ? 0.3 : 0,
         ...(request.jsonSchema === undefined
@@ -70,8 +87,7 @@ export const createLocalModel = (baseUrl: string, fetchFunction: typeof fetch = 
   return {
     complete: async (request) => {
       const response = await send(request, loadingRetry.loadingRetryLimit)
-      const content = completionSchema.parse(await response.json()).choices[0]?.message.content ?? ''
-      return stripThinking(content)
+      return stripThinking(textOfStream(await response.text()))
     },
     name: async () => {
       try {
