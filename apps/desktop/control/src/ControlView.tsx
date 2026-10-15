@@ -55,8 +55,9 @@ const PhaseBadge = ({ state }: { state: ControlState }) => (
   </Badge>
 )
 
-const SwitchControl = ({ snapshot, size, onChange }: { snapshot: Snapshot; size: '1' | '2'; onChange: (request: SwitchRequest) => void }) => (
-  <SegmentedControl.Root size={size} value={switchValue(snapshot)} onValueChange={(value) => onChange(requestFor(value))}>
+// SegmentedControl has no disabled prop, so inert takes it out of reach of clicks and keys.
+const SwitchControl = ({ snapshot, size, disabled, onChange }: { snapshot: Snapshot; size: '1' | '2'; disabled: boolean; onChange: (request: SwitchRequest) => void }) => (
+  <SegmentedControl.Root size={size} inert={disabled} value={switchValue(snapshot)} onValueChange={(value) => onChange(requestFor(value))}>
     <SegmentedControl.Item value="sealed">Sealed</SegmentedControl.Item>
     <SegmentedControl.Item value="ask">Ask</SegmentedControl.Item>
     <SegmentedControl.Item value="open-15">Open 15 min</SegmentedControl.Item>
@@ -91,6 +92,8 @@ export const ControlView = () => {
   const { state } = snapshot
   const running = state.phase === 'running'
   const working = ['setting-up', 'starting', 'stopping', 'checking'].includes(state.phase)
+  // Leaving the page or changing the switch mid-swap would hide how the install ended.
+  const installing = state.update.status === 'installing'
   const setSwitch = (request: SwitchRequest) => run(() => control.setSwitch(request))
 
   // Above the Offee page, this page shrinks to one bar; the window keeps the two apart.
@@ -105,8 +108,8 @@ export const ControlView = () => {
           <PhaseBadge state={state} />
         </Flex>
         <Flex align="center" gap="3">
-          {running && <SwitchControl snapshot={snapshot} size="1" onChange={setSwitch} />}
-          <Button size="1" variant="soft" onClick={() => run(control.showSettings)}>
+          {running && <SwitchControl snapshot={snapshot} size="1" disabled={installing} onChange={setSwitch} />}
+          <Button size="1" variant="soft" disabled={installing} onClick={() => run(control.showSettings)}>
             <GearIcon /> Settings
           </Button>
         </Flex>
@@ -121,7 +124,7 @@ export const ControlView = () => {
         <Flex align="center" gap="3">
           <PhaseBadge state={state} />
           {running && (
-            <Button size="2" onClick={() => run(control.openOffee)}>
+            <Button size="2" disabled={installing} onClick={() => run(control.openOffee)}>
               <ArrowLeftIcon /> Back to Offee
             </Button>
           )}
@@ -180,7 +183,7 @@ export const ControlView = () => {
               </Text>
               {state.gateway?.mode === 'open' ? <LockOpen1Icon /> : <LockClosedIcon />}
             </Flex>
-            <SwitchControl snapshot={snapshot} size="2" onChange={setSwitch} />
+            <SwitchControl snapshot={snapshot} size="2" disabled={installing} onChange={setSwitch} />
             <Text size="1" color="gray">
               Sealed: nothing leaves. Ask: each request waits for you in a dialog showing what would be sent. Open: listed destinations only,
               closing again on its own.
