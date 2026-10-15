@@ -28,14 +28,14 @@ export const ReviewView = () => {
             <FilePickerButton
               accept="audio/*,video/*,.m4a,.mp3,.wav,.ogg,.webm,.mp4"
               disabled={page.busy}
-              onPick={(file) => page.run(async () => page.set({ source: (await api.transcribe(file)).text }))}
+              onPick={(file) => page.run({ kind: 'transcribe', label: `Transcribing ${file.name}` }, async (signal) => page.set({ source: (await api.transcribe(file, signal)).text }))}
             >
               Transcribe a recording
             </FilePickerButton>
             <FilePickerButton
               accept=".pdf,.docx,.txt,.md"
               disabled={page.busy}
-              onPick={(file) => page.run(async () => page.set({ source: (await api.extractText(file)).text }))}
+              onPick={(file) => page.run({ kind: 'extract', label: `Reading ${file.name}` }, async (signal) => page.set({ source: (await api.extractText(file, signal)).text }))}
             >
               Load a document
             </FilePickerButton>
@@ -67,7 +67,7 @@ export const ReviewView = () => {
         <Button
           loading={page.busy}
           disabled={source.trim() === ''}
-          onClick={() => page.run(async () => page.set({ result: await api.review({ profileId, personaId, source, templateId }) }))}
+          onClick={() => page.run({ kind: 'review', label: 'Writing a review' }, async (signal) => page.set({ result: await api.review({ profileId, personaId, source, templateId }, signal) }))}
         >
           <ReaderIcon /> Write the review
         </Button>

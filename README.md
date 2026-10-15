@@ -13,7 +13,8 @@ A scan of a personal data sheet is read into a new profile, checked and saved; t
 form is opened and filled from that profile. Recorded on a Mac against the real app and its
 local model; the two waits for the model (about 5 and 1½ minutes) are cut and marked. Every
 person and number in it is made up;
-the two documents are in [`docs/demo`](docs/demo) to try yourself.
+the two documents are in [`apps/web/public/samples`](apps/web/public/samples), and the app
+offers them, with a sample Library document, behind a "Try the sample" button on each page.
 
 ## In plain words
 

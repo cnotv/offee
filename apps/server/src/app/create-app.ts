@@ -104,9 +104,9 @@ export const createApp = (dependencies: AppDependencies): Hono => {
     const upload = await readUpload(context)
     if (upload === null) return context.json({ error: 'Send the document as a "file" field' }, 400)
     try {
-      const extracted = await extractText(upload.file.name, upload.file.type, new Uint8Array(await upload.file.arrayBuffer()))
+      const extracted = await extractText(upload.file.name, upload.file.type, new Uint8Array(await upload.file.arrayBuffer()), context.req.raw.signal)
       if (extracted.text === '') return context.json({ error: `No text found in ${upload.file.name}, even with OCR.` }, 422)
-      return context.json(await dependencies.workflows.readProfileDocument({ name: upload.file.name, text: extracted.text }))
+      return context.json(await dependencies.workflows.readProfileDocument({ name: upload.file.name, text: extracted.text }, context.req.raw.signal))
     } catch (error) {
       return context.json({ error: describeError(error) }, 422)
     }
@@ -130,7 +130,7 @@ export const createApp = (dependencies: AppDependencies): Hono => {
     const upload = await readUpload(context)
     if (upload === null) return context.json({ error: 'Send the document as a "file" field' }, 400)
     try {
-      const extracted = await extractText(upload.file.name, upload.file.type, new Uint8Array(await upload.file.arrayBuffer()))
+      const extracted = await extractText(upload.file.name, upload.file.type, new Uint8Array(await upload.file.arrayBuffer()), context.req.raw.signal)
       if (extracted.text === '') return context.json({ error: `No text found in ${upload.file.name}. Offee read it with OCR too and found nothing.` }, 422)
       const summary = dependencies.documents.add({
         title: upload.file.name,
@@ -144,6 +144,10 @@ export const createApp = (dependencies: AppDependencies): Hono => {
       return context.json({ error: describeError(error) }, 422)
     }
   })
+  app.get('/api/documents/:id', (context) => {
+    const document = dependencies.documents.get(context.req.param('id'))
+    return document === undefined ? context.notFound() : context.json(document)
+  })
   app.put('/api/documents/:id', jsonLimit, async (context) => {
     const input = await readJson(context, documentAssignmentSchema)
     if (!input.ok) return context.json({ error: input.error }, 400)
@@ -156,7 +160,7 @@ export const createApp = (dependencies: AppDependencies): Hono => {
     const upload = await readUpload(context)
     if (upload === null) return context.json({ error: 'Send the file as a "file" field' }, 400)
     try {
-      const extracted = await extractText(upload.file.name, upload.file.type, new Uint8Array(await upload.file.arrayBuffer()))
+      const extracted = await extractText(upload.file.name, upload.file.type, new Uint8Array(await upload.file.arrayBuffer()), context.req.raw.signal)
       return context.json({ text: extracted.text })
     } catch (error) {
       return context.json({ error: describeError(error) }, 422)
@@ -165,25 +169,25 @@ export const createApp = (dependencies: AppDependencies): Hono => {
 
   app.post('/api/chat', jsonLimit, async (context) => {
     const input = await readJson(context, chatRequestSchema)
-    return input.ok ? context.json(await dependencies.workflows.chat(input.data)) : context.json({ error: input.error }, 400)
+    return input.ok ? context.json(await dependencies.workflows.chat(input.data, context.req.raw.signal)) : context.json({ error: input.error }, 400)
   })
   app.post('/api/workflows/reply', jsonLimit, async (context) => {
     const input = await readJson(context, replyRequestSchema)
-    return input.ok ? context.json(await dependencies.workflows.reply(input.data)) : context.json({ error: input.error }, 400)
+    return input.ok ? context.json(await dependencies.workflows.reply(input.data, context.req.raw.signal)) : context.json({ error: input.error }, 400)
   })
   app.post('/api/workflows/translate', jsonLimit, async (context) => {
     const input = await readJson(context, translateRequestSchema)
-    return input.ok ? context.json(await dependencies.workflows.translate(input.data)) : context.json({ error: input.error }, 400)
+    return input.ok ? context.json(await dependencies.workflows.translate(input.data, context.req.raw.signal)) : context.json({ error: input.error }, 400)
   })
   app.get('/api/review-templates', (context) => context.json(dependencies.reviewTemplates))
   app.post('/api/workflows/review', jsonLimit, async (context) => {
     const input = await readJson(context, reviewRequestSchema)
-    return input.ok ? context.json(await dependencies.workflows.review(input.data)) : context.json({ error: input.error }, 400)
+    return input.ok ? context.json(await dependencies.workflows.review(input.data, context.req.raw.signal)) : context.json({ error: input.error }, 400)
   })
   app.post('/api/transcribe', uploadLimit, async (context) => {
     const upload = await readUpload(context)
     if (upload === null) return context.json({ error: 'Send the recording as a "file" field' }, 400)
-    return context.json(await dependencies.workflows.transcribe({ name: upload.file.name, content: new Uint8Array(await upload.file.arrayBuffer()) }))
+    return context.json(await dependencies.workflows.transcribe({ name: upload.file.name, content: new Uint8Array(await upload.file.arrayBuffer()) }, context.req.raw.signal))
   })
 
   app.post('/api/forms/inspect', uploadLimit, async (context) => {
@@ -193,6 +197,7 @@ export const createApp = (dependencies: AppDependencies): Hono => {
       const inspection = await dependencies.workflows.inspectForm(
         { name: upload.file.name, content: new Uint8Array(await upload.file.arrayBuffer()) },
         { profileId: nullableId(upload.fields.profileId), personaId: nullableId(upload.fields.personaId) },
+        context.req.raw.signal,
       )
       return context.json(inspection)
     } catch (error) {
