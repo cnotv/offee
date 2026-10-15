@@ -1,3 +1,4 @@
+import { setTimeout as wait } from 'node:timers/promises'
 import { z } from 'zod'
 
 export type ChatMessage = {
@@ -19,19 +20,31 @@ const completionSchema = z.object({
 
 const modelListSchema = z.object({ data: z.array(z.object({ id: z.string() })) })
 
+export type LoadingRetry = {
+  loadingRetryDelayMs: number
+  loadingRetryLimit: number
+}
+
+// llama.cpp answers 503 until the model is in memory, which takes a minute or two after a start.
+const defaultLoadingRetry: LoadingRetry = { loadingRetryDelayMs: 5000, loadingRetryLimit: 60 }
+
+const isStillLoading = (status: number, body: string): boolean => status === 503 && body.includes('Loading model')
+
 export type LocalModel = {
   complete: (request: CompletionRequest) => Promise<string>
   name: () => Promise<string | null>
 }
 
 /**
- * Talks to llama.cpp's OpenAI-compatible server on the internal network.
+ * Talks to llama.cpp's OpenAI-compatible server on the internal network. While the server is
+ * still loading the model, it asks again every few seconds instead of failing.
  * @param baseUrl Where the server listens.
  * @param fetchFunction The fetch to use, replaceable in tests.
+ * @param loadingRetry How often and how many times to ask again while the model loads.
  * @returns The client.
  */
-export const createLocalModel = (baseUrl: string, fetchFunction: typeof fetch = fetch): LocalModel => ({
-  complete: async (request) => {
+export const createLocalModel = (baseUrl: string, fetchFunction: typeof fetch = fetch, loadingRetry: LoadingRetry = defaultLoadingRetry): LocalModel => {
+  const send = async (request: CompletionRequest, retriesLeft: number): Promise<Response> => {
     const response = await fetchFunction(`${baseUrl}/v1/chat/completions`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -46,20 +59,31 @@ export const createLocalModel = (baseUrl: string, fetchFunction: typeof fetch = 
       }),
       signal: AbortSignal.any([request.signal, AbortSignal.timeout(15 * 60_000)]),
     })
-    if (!response.ok) throw new Error(`The local model answered ${response.status}: ${(await response.text()).slice(0, 300)}`)
-    const content = completionSchema.parse(await response.json()).choices[0]?.message.content ?? ''
-    return stripThinking(content)
-  },
-  name: async () => {
-    try {
-      const response = await fetchFunction(`${baseUrl}/v1/models`, { signal: AbortSignal.timeout(2000) })
-      if (!response.ok) return null
-      return modelListSchema.parse(await response.json()).data[0]?.id ?? null
-    } catch {
-      return null
-    }
-  },
-})
+    if (response.ok) return response
+    const body = await response.text()
+    if (!isStillLoading(response.status, body)) throw new Error(`The local model answered ${response.status}: ${body.slice(0, 300)}`)
+    if (retriesLeft === 0) throw new Error('The local model is still loading. Try again in a few minutes.')
+    await wait(loadingRetry.loadingRetryDelayMs, undefined, { signal: request.signal })
+    return send(request, retriesLeft - 1)
+  }
+
+  return {
+    complete: async (request) => {
+      const response = await send(request, loadingRetry.loadingRetryLimit)
+      const content = completionSchema.parse(await response.json()).choices[0]?.message.content ?? ''
+      return stripThinking(content)
+    },
+    name: async () => {
+      try {
+        const response = await fetchFunction(`${baseUrl}/v1/models`, { signal: AbortSignal.timeout(2000) })
+        if (!response.ok) return null
+        return modelListSchema.parse(await response.json()).data[0]?.id ?? null
+      } catch {
+        return null
+      }
+    },
+  }
+}
 
 /**
  * Removes a reasoning block some local models print before their answer.
