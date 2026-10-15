@@ -94,9 +94,17 @@ export const fieldSuggestionSchema = z.object({
   source: z.enum(['profile', 'model', 'none']),
 })
 
+export const placedFieldSchema = z.object({
+  name: z.string().min(1).max(200),
+  line: z.number().int().min(1),
+  kind: z.enum(['text', 'checkbox']),
+  position: z.enum(['below', 'above', 'right', 'left']),
+})
+
 export const formFillRequestSchema = z.object({
   formFileId: z.string().min(1),
   profileId: z.string().min(1),
   values: z.array(fieldSuggestionSchema).max(2_000),
+  placedFields: z.array(placedFieldSchema).max(2_000),
   sign: z.boolean(),
 })

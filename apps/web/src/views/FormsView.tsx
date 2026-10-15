@@ -1,6 +1,6 @@
 import { ClockIcon, DownloadIcon, FileIcon, Pencil1Icon } from '@radix-ui/react-icons'
 import { Badge, Button, Callout, Card, Checkbox, Flex, Heading, Select, Table, Text, TextField } from '@radix-ui/themes'
-import type { FormInspection } from '@offee/contracts'
+import type { FormInspection, PlacedFieldPosition } from '@offee/contracts'
 import { ContextPicker } from '@/components/ContextPicker'
 import { ErrorCallout } from '@/components/ErrorCallout'
 import { FilePickerButton } from '@/components/FilePickerButton'
@@ -18,6 +18,12 @@ import { loadSample, sampleFiles } from '@/lib/samples'
 const sourceColor = { profile: 'grass', model: 'amber', none: 'gray' } as const
 const sourceLabel = { profile: 'Profile', model: 'Model', none: 'Empty' } as const
 const noChoice = '__none'
+const positions: { value: PlacedFieldPosition; label: string }[] = [
+  { value: 'below', label: 'Below the label' },
+  { value: 'above', label: 'Above the label' },
+  { value: 'right', label: 'Right of the label' },
+  { value: 'left', label: 'Left of the label' },
+]
 
 type FieldEditorProps = {
   field: FormInspection['fields'][number]
@@ -63,24 +69,27 @@ export const FormsView = () => {
   const { profiles } = useDirectory()
   const { history } = useOperations()
   const page = useWorkflowPage('forms')
-  const { inspection, values, result } = page.state
+  const { inspection, values, placedFields, result } = page.state
   const profile = profiles.find((candidate) => candidate.id === profileId)
 
   const setValue = (name: string, value: string) =>
     page.change((current) => ({ values: current.values.map((entry) => (entry.name === name ? { ...entry, value } : entry)) }))
 
+  const setPosition = (name: string, position: PlacedFieldPosition) =>
+    page.change((current) => ({ placedFields: current.placedFields.map((placed) => (placed.name === name ? { ...placed, position } : placed)) }))
+
   const open = (fileName: string, choose: (signal: AbortSignal) => Promise<File>) => {
     if (profileId === null) return
     page.run({ kind: 'form', label: `Reading ${fileName}` }, async (signal) => {
       const inspected = await api.inspectForm(await choose(signal), { profileId, personaId }, signal)
-      page.set({ inspection: inspected, values: inspected.suggestions, result: null })
+      page.set({ inspection: inspected, values: inspected.suggestions, placedFields: inspected.placedFields, result: null })
     })
   }
 
   const fill = (sign: boolean) => {
     if (inspection === null || profileId === null) return
     page.run({ kind: 'form-save', label: `${sign ? 'Signing' : 'Filling'} ${inspection.fileName}` }, async () =>
-      page.set({ result: await api.fillForm({ formFileId: inspection.formFileId, profileId, values, sign }) }),
+      page.set({ result: await api.fillForm({ formFileId: inspection.formFileId, profileId, values, placedFields, sign }) }),
     )
   }
 
@@ -121,7 +130,8 @@ export const FormsView = () => {
       {inspection !== null && inspection.fields.length === 0 && (
         <Callout.Root color="amber" variant="surface">
           <Callout.Text>
-            {inspection.fileName} has no fillable fields. Forms without fields are not supported in this build yet.
+            Offee found no place to fill in {inspection.fileName}: it has no form fields, and no text labels to place them by. A
+            scanned form is not supported yet.
           </Callout.Text>
         </Callout.Root>
       )}
@@ -135,17 +145,27 @@ export const FormsView = () => {
             <Text size="2" color="gray">
               Check every value. Nothing is written until you save.
             </Text>
+            {placedFields.length > 0 && (
+              <Callout.Root color="amber" variant="surface">
+                <Callout.Text>
+                  This PDF had no fields, so the model placed them by reading its labels. Check where each value lands in the saved PDF;
+                  if one sits on the wrong side of its label, change it under Where and save again.
+                </Callout.Text>
+              </Callout.Root>
+            )}
             <Table.Root variant="ghost" size="1">
               <Table.Header>
                 <Table.Row>
                   <Table.ColumnHeaderCell>Field</Table.ColumnHeaderCell>
                   <Table.ColumnHeaderCell>Value</Table.ColumnHeaderCell>
+                  {placedFields.length > 0 && <Table.ColumnHeaderCell>Where</Table.ColumnHeaderCell>}
                   <Table.ColumnHeaderCell>From</Table.ColumnHeaderCell>
                 </Table.Row>
               </Table.Header>
               <Table.Body>
                 {inspection.fields.map((field) => {
                   const entry = values.find((candidate) => candidate.name === field.name)
+                  const placed = placedFields.find((candidate) => candidate.name === field.name)
                   return (
                     <Table.Row key={field.name} align="center">
                       <Table.RowHeaderCell>
@@ -154,6 +174,28 @@ export const FormsView = () => {
                       <Table.Cell className="form-value-cell">
                         <FieldEditor field={field} value={entry?.value ?? ''} onChange={(value) => setValue(field.name, value)} />
                       </Table.Cell>
+                      {placedFields.length > 0 && (
+                        <Table.Cell>
+                          {placed !== undefined && (
+                            <Select.Root
+                              value={placed.position}
+                              onValueChange={(next) => {
+                                const position = positions.find((candidate) => candidate.value === next)
+                                if (position !== undefined) setPosition(field.name, position.value)
+                              }}
+                            >
+                              <Select.Trigger aria-label={`Where ${field.name} goes`} />
+                              <Select.Content>
+                                {positions.map((position) => (
+                                  <Select.Item key={position.value} value={position.value}>
+                                    {position.label}
+                                  </Select.Item>
+                                ))}
+                              </Select.Content>
+                            </Select.Root>
+                          )}
+                        </Table.Cell>
+                      )}
                       <Table.Cell>
                         <Badge color={sourceColor[entry?.source ?? 'none']} variant="soft">
                           {sourceLabel[entry?.source ?? 'none']}

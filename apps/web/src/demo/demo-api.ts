@@ -246,6 +246,7 @@ export const createDemoApi = (): OffeeApi => {
           return { name: field.name, value: '', source: 'none' }
         }),
         model: demoLocalModel,
+        placedFields: [],
       }
     },
     fillForm: async (request) => {

@@ -36,8 +36,9 @@ would leave, and say yes or no. Offee itself cannot open it.
   next model. With Offee nothing leaves your computer unless you let it, request by request.
 - **It knows your own documents.** A search engine knows the web, not your rental contract.
   Offee answers from the files you gave it and shows which one each answer came from.
-- **It does the task, not just the talk.** It fills the actual PDF form and can sign it; it
-  writes the reply in your name and tone; it translates a whole document, paragraph by paragraph.
+- **It does the task, not just the talk.** It fills the actual PDF form and can sign it, even
+  one drawn without fields, where the model places them by reading the labels; it writes the
+  reply in your name and tone; it translates a whole document, paragraph by paragraph.
 - **No account, works offline.** Once it is installed, it needs no internet
   at all.
 - **You can check everything.** Every run is logged: what went in, which model answered and
@@ -65,7 +66,7 @@ needs a Mac with Apple Silicon or a Linux PC, and 16 GB of memory.
 
 | Workflow            | In                                        | Out                                   |
 | ------------------- | ----------------------------------------- | ------------------------------------- |
-| Fill and sign       | a PDF form and a profile                  | the filled PDF, signed                |
+| Fill and sign       | a PDF form, fields or not, and a profile  | the filled PDF, signed                |
 | Read into a profile | an ID, a CV or a scan of either           | the person's details, to check and save |
 | Review              | notes, text, or a recording of a talk     | a structured review, DOCX or PDF      |
 | Translate           | a document and a target language          | the document translated, layout kept  |
