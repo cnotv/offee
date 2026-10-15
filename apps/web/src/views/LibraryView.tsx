@@ -1,17 +1,20 @@
-import { TrashIcon } from '@radix-ui/react-icons'
-import { Callout, Flex, IconButton, Select, Text } from '@radix-ui/themes'
+import { FileIcon, TrashIcon } from '@radix-ui/react-icons'
+import { Button, Callout, Dialog, Flex, IconButton, ScrollArea, Select, Text } from '@radix-ui/themes'
 import { useMemo, useState } from 'react'
 import type { ColumnDef } from '@tanstack/react-table'
-import type { DocumentAssignment, DocumentSummary, Persona, Profile } from '@offee/contracts'
+import type { DocumentAssignment, DocumentDetail, DocumentSummary, Persona, Profile } from '@offee/contracts'
 import { ErrorCallout } from '@/components/ErrorCallout'
 import { FilePickerButton } from '@/components/FilePickerButton'
+import { RunningOperations } from '@/components/Operations'
 import { SortableTable } from '@/components/tables/SortableTable'
 import type { sortableTableFeatures } from '@/components/tables/sortable-table-features'
 import { useAction } from '@/hooks/useAction'
 import { useDirectory } from '@/hooks/useDirectory'
 import { useLoad } from '@/hooks/useLoad'
+import { useOperations } from '@/hooks/useOperations'
 import { api } from '@/lib/api'
 import { formatTime } from '@/lib/presentation'
+import { loadSample, sampleFiles } from '@/lib/samples'
 
 const shared = '__shared'
 
@@ -60,17 +63,80 @@ const AssignmentSelect = ({ value, profiles, personas, onChange }: AssignmentSel
   </Select.Root>
 )
 
+type DocumentPreviewProps = { document: DocumentSummary | null; onClose: () => void }
+
+/** The text Offee keeps for a document: exactly what answers, replies and forms draw on. */
+const DocumentPreview = ({ document, onClose }: DocumentPreviewProps) => {
+  const [loaded, setLoaded] = useState<DocumentDetail | null>(null)
+  const action = useAction()
+  const shown = loaded !== null && loaded.id === document?.id ? loaded : null
+  return (
+    <Dialog.Root
+      open={document !== null}
+      onOpenChange={(open) => {
+        if (!open) onClose()
+      }}
+    >
+      <Dialog.Content
+        maxWidth="760px"
+        onOpenAutoFocus={() => {
+          if (document !== null) action.run(async () => setLoaded(await api.document(document.id)))
+        }}
+      >
+        <Dialog.Title>{document?.title}</Dialog.Title>
+        <Dialog.Description size="2" color="gray" mb="3">
+          The text Offee read from it, {document?.characterCount.toLocaleString()} characters. Answers draw on this, not on the layout.
+        </Dialog.Description>
+        <ErrorCallout error={action.error} />
+        <ScrollArea type="auto" scrollbars="vertical" style={{ maxHeight: '60vh' }}>
+          <Text as="p" size="2" className="document-preview">
+            {shown === null ? 'Loading…' : shown.text}
+          </Text>
+        </ScrollArea>
+        <Flex justify="end" mt="4">
+          <Dialog.Close>
+            <Button variant="soft" color="gray">
+              Close
+            </Button>
+          </Dialog.Close>
+        </Flex>
+      </Dialog.Content>
+    </Dialog.Root>
+  )
+}
+
 /** The documents Offee answers from, and who may use each. */
 export const LibraryView = () => {
   const { profiles, personas } = useDirectory()
   const documents = useLoad(api.documents)
   const [uploadAssignment, setUploadAssignment] = useState<DocumentAssignment>({ profileId: null, personaId: null })
+  const [previewed, setPreviewed] = useState<DocumentSummary | null>(null)
   const action = useAction()
+  const { start } = useOperations()
   const reload = documents.reload
+
+  // Runs as an operation, so adding a long scan goes on while the person works elsewhere.
+  const add = (fileName: string, choose: (signal: AbortSignal) => Promise<File>) =>
+    action.run(() =>
+      start('document', `Adding ${fileName} to the Library`, async (signal) => {
+        await api.uploadDocument(await choose(signal), uploadAssignment, signal)
+        reload()
+      }),
+    )
 
   const columns = useMemo<ColumnDef<typeof sortableTableFeatures, DocumentSummary, unknown>[]>(
     () => [
-      { id: 'title', accessorFn: (row) => row.title, header: 'Document', sortFn: 'alphanumeric' },
+      {
+        id: 'title',
+        accessorFn: (row) => row.title,
+        header: 'Document',
+        sortFn: 'alphanumeric',
+        cell: (context) => (
+          <Button variant="ghost" onClick={() => setPreviewed(context.row.original)} aria-label={`Preview ${context.row.original.title}`}>
+            {context.row.original.title}
+          </Button>
+        ),
+      },
       {
         id: 'size',
         accessorFn: (row) => row.characterCount,
@@ -123,10 +189,7 @@ export const LibraryView = () => {
         <FilePickerButton
           accept=".pdf,.docx,.txt,.md,.eml,.csv,.json,.png,.jpg,.jpeg,.tif,.tiff"
           disabled={action.busy}
-          onPick={(file) => action.run(async () => {
-            await api.uploadDocument(file, uploadAssignment)
-            reload()
-          })}
+          onPick={(file) => add(file.name, async () => file)}
         >
           Add a document
         </FilePickerButton>
@@ -134,7 +197,11 @@ export const LibraryView = () => {
           for
         </Text>
         <AssignmentSelect value={uploadAssignment} profiles={profiles} personas={personas} onChange={setUploadAssignment} />
+        <Button variant="ghost" disabled={action.busy} onClick={() => add(sampleFiles.document.name, (signal) => loadSample(sampleFiles.document, signal))}>
+          <FileIcon /> Try the sample document
+        </Button>
       </Flex>
+      <RunningOperations kinds={['document']} />
       <ErrorCallout error={action.error ?? documents.error} />
       {documents.value !== null && documents.value.length === 0 ? (
         <Callout.Root variant="surface">
@@ -146,6 +213,7 @@ export const LibraryView = () => {
       ) : (
         <SortableTable columns={columns} rows={documents.value ?? []} rowKeyOf={(row) => row.id} numericColumnIds={['size']} />
       )}
+      <DocumentPreview document={previewed} onClose={() => setPreviewed(null)} />
     </Flex>
   )
 }

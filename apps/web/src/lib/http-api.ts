@@ -2,6 +2,7 @@ import { z } from 'zod'
 import type { WorkflowContext } from '@offee/contracts'
 import {
   appStatusSchema,
+  documentDetailSchema,
   documentSummarySchema,
   errorBodySchema,
   extractedTextSchema,
@@ -29,8 +30,9 @@ const readBody = async <Output>(response: Response, schema: z.ZodType<Output>): 
 
 const getJson = async <Output>(path: string, schema: z.ZodType<Output>): Promise<Output> => readBody(await fetch(path), schema)
 
-const sendJson = async <Output>(method: 'POST' | 'PUT', path: string, body: unknown, schema: z.ZodType<Output>): Promise<Output> =>
-  readBody(await fetch(path, { method, headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }), schema)
+// A signal stops the request; the server notices the closed connection and stops the model call it waits on.
+const sendJson = async <Output>(method: 'POST' | 'PUT', path: string, body: unknown, schema: z.ZodType<Output>, signal?: AbortSignal): Promise<Output> =>
+  readBody(await fetch(path, { method, headers: { 'content-type': 'application/json' }, body: JSON.stringify(body), signal }), schema)
 
 const sendWithoutAnswer = async (method: 'PUT' | 'DELETE', path: string, body?: unknown): Promise<void> => {
   const response = await fetch(path, {
@@ -40,11 +42,11 @@ const sendWithoutAnswer = async (method: 'PUT' | 'DELETE', path: string, body?: 
   if (!response.ok) await readBody(response, z.unknown())
 }
 
-const upload = async <Output>(path: string, file: File, fields: Record<string, string>, schema: z.ZodType<Output>): Promise<Output> => {
+const upload = async <Output>(path: string, file: File, fields: Record<string, string>, schema: z.ZodType<Output>, signal: AbortSignal): Promise<Output> => {
   const form = new FormData()
   form.set('file', file)
   Object.entries(fields).forEach(([key, value]) => form.set(key, value))
-  return readBody(await fetch(path, { method: 'POST', body: form }), schema)
+  return readBody(await fetch(path, { method: 'POST', body: form, signal }), schema)
 }
 
 const contextFields = (context: WorkflowContext): Record<string, string> => ({
@@ -59,24 +61,24 @@ export const httpApi: OffeeApi = {
   createProfile: (input) => sendJson('POST', '/api/profiles', input, profileSchema),
   updateProfile: (id, input) => sendJson('PUT', `/api/profiles/${id}`, input, profileSchema),
   deleteProfile: (id) => sendWithoutAnswer('DELETE', `/api/profiles/${id}`),
-  readProfileDocument: (file) => upload('/api/profiles/read-document', file, {}, profileReadingSchema),
+  readProfileDocument: (file, signal) => upload('/api/profiles/read-document', file, {}, profileReadingSchema, signal),
   personas: () => getJson('/api/personas', z.array(personaSchema)),
   createPersona: (input) => sendJson('POST', '/api/personas', input, personaSchema),
   updatePersona: (id, input) => sendJson('PUT', `/api/personas/${id}`, input, personaSchema),
   deletePersona: (id) => sendWithoutAnswer('DELETE', `/api/personas/${id}`),
   documents: () => getJson('/api/documents', z.array(documentSummarySchema)),
-  uploadDocument: (file, assignment) =>
-    upload('/api/documents', file, contextFields(assignment), documentSummarySchema),
+  document: (id) => getJson(`/api/documents/${id}`, documentDetailSchema),
+  uploadDocument: (file, assignment, signal) => upload('/api/documents', file, contextFields(assignment), documentSummarySchema, signal),
   assignDocument: (id, assignment) => sendWithoutAnswer('PUT', `/api/documents/${id}`, assignment),
   deleteDocument: (id) => sendWithoutAnswer('DELETE', `/api/documents/${id}`),
-  extractText: (file) => upload('/api/extract', file, {}, extractedTextSchema),
-  chat: (request) => sendJson('POST', '/api/chat', request, workflowResultSchema),
-  reply: (request) => sendJson('POST', '/api/workflows/reply', request, workflowResultSchema),
-  translate: (request) => sendJson('POST', '/api/workflows/translate', request, workflowResultSchema),
+  extractText: (file, signal) => upload('/api/extract', file, {}, extractedTextSchema, signal),
+  chat: (request, signal) => sendJson('POST', '/api/chat', request, workflowResultSchema, signal),
+  reply: (request, signal) => sendJson('POST', '/api/workflows/reply', request, workflowResultSchema, signal),
+  translate: (request, signal) => sendJson('POST', '/api/workflows/translate', request, workflowResultSchema, signal),
   reviewTemplates: () => getJson('/api/review-templates', z.array(reviewTemplateSchema)),
-  review: (request) => sendJson('POST', '/api/workflows/review', request, workflowResultSchema),
-  transcribe: (file) => upload('/api/transcribe', file, {}, transcriptionResultSchema),
-  inspectForm: (file, context) => upload('/api/forms/inspect', file, contextFields(context), formInspectionSchema),
+  review: (request, signal) => sendJson('POST', '/api/workflows/review', request, workflowResultSchema, signal),
+  transcribe: (file, signal) => upload('/api/transcribe', file, {}, transcriptionResultSchema, signal),
+  inspectForm: (file, context, signal) => upload('/api/forms/inspect', file, contextFields(context), formInspectionSchema, signal),
   fillForm: (request) => sendJson('POST', '/api/forms/fill', request, formFillResultSchema),
   runs: () => getJson('/api/runs', z.array(runSummarySchema)),
   run: (id) => getJson(`/api/runs/${id}`, runDetailSchema),

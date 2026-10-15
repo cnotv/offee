@@ -9,6 +9,8 @@ export type CompletionRequest = {
   messages: ChatMessage[]
   maxTokens: number
   jsonSchema?: Record<string, unknown>
+  /** Aborts when the person stops the operation, so the model stops writing for nobody. */
+  signal: AbortSignal
 }
 
 const completionSchema = z.object({
@@ -42,7 +44,7 @@ export const createLocalModel = (baseUrl: string, fetchFunction: typeof fetch = 
           ? {}
           : { response_format: { type: 'json_schema', json_schema: { name: 'answer', schema: request.jsonSchema } } }),
       }),
-      signal: AbortSignal.timeout(15 * 60_000),
+      signal: AbortSignal.any([request.signal, AbortSignal.timeout(15 * 60_000)]),
     })
     if (!response.ok) throw new Error(`The local model answered ${response.status}: ${(await response.text()).slice(0, 300)}`)
     const content = completionSchema.parse(await response.json()).choices[0]?.message.content ?? ''

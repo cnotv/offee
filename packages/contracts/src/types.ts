@@ -58,6 +58,9 @@ export type DocumentSummary = {
   createdAt: number
 }
 
+/** A document with the text Offee keeps for it, for the Library's preview. */
+export type DocumentDetail = DocumentSummary & { text: string }
+
 export type DocumentAssignment = {
   profileId: string | null
   personaId: string | null

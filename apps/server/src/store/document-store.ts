@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import type { DatabaseSync } from 'node:sqlite'
 import { z } from 'zod'
-import type { Citation, DocumentAssignment, DocumentSummary, WorkflowContext } from '@offee/contracts'
+import type { Citation, DocumentAssignment, DocumentDetail, DocumentSummary, WorkflowContext } from '@offee/contracts'
 import { chunkText } from '../knowledge/chunk-text.ts'
 import { buildSearchQuery } from '../knowledge/search-query.ts'
 
@@ -14,6 +14,8 @@ const documentRowSchema = z.object({
   persona_id: z.string().nullable(),
   created_at: z.number(),
 })
+
+const textRowSchema = z.object({ text: z.string() })
 
 const hitRowSchema = z.object({ document_id: z.string(), title: z.string(), content: z.string() })
 
@@ -46,6 +48,10 @@ export type DocumentStore = ReturnType<typeof createDocumentStore>
  */
 export const createDocumentStore = (database: DatabaseSync, now: () => number) => ({
   list: (): DocumentSummary[] => database.prepare(`SELECT ${summaryColumns} FROM documents ORDER BY created_at DESC`).all().map(toSummary),
+  get: (id: string): DocumentDetail | undefined => {
+    const row = database.prepare(`SELECT ${summaryColumns}, text FROM documents WHERE id = ?`).get(id)
+    return row === undefined ? undefined : { ...toSummary(row), text: textRowSchema.parse(row).text }
+  },
   add: (input: { title: string; mimeType: string; text: string } & DocumentAssignment): DocumentSummary => {
     const id = randomUUID()
     database

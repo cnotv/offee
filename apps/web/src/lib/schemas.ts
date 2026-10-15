@@ -41,6 +41,8 @@ export const documentSummarySchema = z.object({
   createdAt: z.number(),
 })
 
+export const documentDetailSchema = documentSummarySchema.extend({ text: z.string() })
+
 export const modelUsedSchema = z.object({ kind: z.enum(['local', 'remote']), name: z.string(), fallbackReason: z.string().nullable() })
 
 export const citationSchema = z.object({ documentId: z.string(), documentTitle: z.string(), excerpt: z.string() })

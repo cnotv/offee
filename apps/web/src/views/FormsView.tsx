@@ -1,15 +1,18 @@
-import { DownloadIcon, Pencil1Icon } from '@radix-ui/react-icons'
+import { ClockIcon, DownloadIcon, FileIcon, Pencil1Icon } from '@radix-ui/react-icons'
 import { Badge, Button, Callout, Card, Checkbox, Flex, Heading, Select, Table, Text, TextField } from '@radix-ui/themes'
-import { useState } from 'react'
-import type { FieldSuggestion, FormFillResult, FormInspection } from '@offee/contracts'
+import type { FormInspection } from '@offee/contracts'
 import { ContextPicker } from '@/components/ContextPicker'
 import { ErrorCallout } from '@/components/ErrorCallout'
 import { FilePickerButton } from '@/components/FilePickerButton'
+import { RunningOperations } from '@/components/Operations'
 import { ModelBadge } from '@/components/WorkflowResultCard'
-import { useAction } from '@/hooks/useAction'
 import { useDirectory } from '@/hooks/useDirectory'
+import { useOperations } from '@/hooks/useOperations'
 import { useWorkContext } from '@/hooks/useWorkContext'
+import { useWorkflowPage } from '@/hooks/useWorkflowPages'
 import { api } from '@/lib/api'
+import { describeEstimate, estimateOf } from '@/lib/estimates'
+import { loadSample, sampleFiles } from '@/lib/samples'
 
 const sourceColor = { profile: 'grass', model: 'amber', none: 'gray' } as const
 const sourceLabel = { profile: 'Profile', model: 'Model', none: 'Empty' } as const
@@ -50,22 +53,34 @@ const FieldEditor = ({ field, value, onChange }: FieldEditorProps) => {
   return <TextField.Root aria-label={field.name} value={value} onChange={(event) => onChange(event.target.value)} />
 }
 
-/** Fill a PDF form from a profile, check every value, then save it filled or signed. */
+/**
+ * Fill a PDF form from a profile, check every value, then save it filled or signed. The form and
+ * its values live above the router, so the model can read it while the person works elsewhere.
+ */
 export const FormsView = () => {
   const { profileId, personaId } = useWorkContext()
   const { profiles } = useDirectory()
-  const [inspection, setInspection] = useState<FormInspection | null>(null)
-  const [values, setValues] = useState<FieldSuggestion[]>([])
-  const [result, setResult] = useState<FormFillResult | null>(null)
-  const action = useAction()
+  const { history } = useOperations()
+  const page = useWorkflowPage('forms')
+  const { inspection, values, result } = page.state
   const profile = profiles.find((candidate) => candidate.id === profileId)
 
   const setValue = (name: string, value: string) =>
-    setValues((current) => current.map((entry) => (entry.name === name ? { ...entry, value } : entry)))
+    page.change((current) => ({ values: current.values.map((entry) => (entry.name === name ? { ...entry, value } : entry)) }))
+
+  const open = (fileName: string, choose: (signal: AbortSignal) => Promise<File>) => {
+    if (profileId === null) return
+    page.run({ kind: 'form', label: `Reading ${fileName}` }, async (signal) => {
+      const inspected = await api.inspectForm(await choose(signal), { profileId, personaId }, signal)
+      page.set({ inspection: inspected, values: inspected.suggestions, result: null })
+    })
+  }
 
   const fill = (sign: boolean) => {
     if (inspection === null || profileId === null) return
-    action.run(async () => setResult(await api.fillForm({ formFileId: inspection.formFileId, profileId, values, sign })))
+    page.run({ kind: 'form-save', label: `${sign ? 'Signing' : 'Filling'} ${inspection.fileName}` }, async () =>
+      page.set({ result: await api.fillForm({ formFileId: inspection.formFileId, profileId, values, sign }) }),
+    )
   }
 
   return (
@@ -76,28 +91,31 @@ export const FormsView = () => {
           <Callout.Text>Choose a profile above: its details fill the form and its certificate signs it.</Callout.Text>
         </Callout.Root>
       )}
+      <Callout.Root variant="surface" color="gray">
+        <Callout.Icon>
+          <ClockIcon />
+        </Callout.Icon>
+        <Callout.Text>
+          The AI that reads the form and suggests values runs on this machine, not in the cloud, so it takes a while: reading a form
+          takes {describeEstimate(estimateOf(history, 'form'))}, then saving it filled or signed takes{' '}
+          {describeEstimate(estimateOf(history, 'form-save'))}. You can use the rest of Offee meanwhile; the indicator at the top shows
+          what runs and stops it.
+        </Callout.Text>
+      </Callout.Root>
       <Flex gap="2" align="center" wrap="wrap">
-        <FilePickerButton
-          accept=".pdf,application/pdf"
-          disabled={action.busy || profileId === null}
-          onPick={(file) =>
-            action.run(async () => {
-              const inspected = await api.inspectForm(file, { profileId, personaId })
-              setInspection(inspected)
-              setValues(inspected.suggestions)
-              setResult(null)
-            })
-          }
-        >
+        <FilePickerButton accept=".pdf,application/pdf" disabled={page.busy || profileId === null} onPick={(file) => open(file.name, async () => file)}>
           Open a PDF form
         </FilePickerButton>
-        {action.busy && (
-          <Text size="1" color="gray">
-            Reading the form and suggesting values…
-          </Text>
-        )}
+        <Button
+          variant="ghost"
+          disabled={page.busy || profileId === null}
+          onClick={() => open(sampleFiles.form.name, (signal) => loadSample(sampleFiles.form, signal))}
+        >
+          <FileIcon /> Try the sample form
+        </Button>
       </Flex>
-      <ErrorCallout error={action.error} />
+      <RunningOperations kinds={['form', 'form-save']} />
+      <ErrorCallout error={page.error} />
       {inspection !== null && inspection.fields.length === 0 && (
         <Callout.Root color="amber" variant="surface">
           <Callout.Text>
@@ -145,10 +163,10 @@ export const FormsView = () => {
               </Table.Body>
             </Table.Root>
             <Flex gap="2" justify="end" wrap="wrap">
-              <Button variant="soft" loading={action.busy} onClick={() => fill(false)}>
+              <Button variant="soft" loading={page.busy} onClick={() => fill(false)}>
                 <Pencil1Icon /> Save filled
               </Button>
-              <Button loading={action.busy} onClick={() => fill(true)}>
+              <Button loading={page.busy} onClick={() => fill(true)}>
                 <Pencil1Icon /> Save filled and signed
               </Button>
             </Flex>

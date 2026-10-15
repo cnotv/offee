@@ -12,7 +12,14 @@ const reviewTemplates = z.array(reviewTemplateSchema).parse(reviewTemplatesFile)
 // A model answers in seconds on a Mac; the pause lets a visitor see the page while it works.
 const demoAnswerDelayMilliseconds = 1200
 
-const pause = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, demoAnswerDelayMilliseconds))
+const pause = (signal: AbortSignal): Promise<void> =>
+  new Promise((resolve, reject) => {
+    const timer = setTimeout(resolve, demoAnswerDelayMilliseconds)
+    signal.addEventListener('abort', () => {
+      clearTimeout(timer)
+      reject(new Error('Stopped'))
+    })
+  })
 
 const plainTextFile = (file: File): boolean => file.type.startsWith('text/') || /\.(txt|md|csv|eml)$/i.test(file.name)
 
@@ -167,6 +174,11 @@ export const createDemoApi = (): OffeeApi => {
       memory.personas = memory.personas.filter((persona) => persona.id !== id)
     },
     documents: async () => memory.documents.map(documentSummaryOf),
+    document: async (id) => {
+      const document = memory.documents.find((candidate) => candidate.id === id)
+      if (document === undefined) throw missing('document')
+      return document
+    },
     uploadDocument: async (file, assignment) => {
       const text = await readPlainText(file)
       const document: DemoDocument = {
@@ -188,39 +200,40 @@ export const createDemoApi = (): OffeeApi => {
       memory.documents = memory.documents.filter((document) => document.id !== id)
     },
     extractText: async (file) => ({ text: await readPlainText(file) }),
-    chat: async (request) => {
-      await pause()
+    chat: async (request, signal) => {
+      await pause(signal)
       const answer = answerFromDocuments(request.message, memory.documents.filter(usableBy(request)))
       const run = record('chat', request.message.slice(0, 80), request.message, answer.text, request.conversationId)
       return { runId: run.id, text: answer.text, citations: answer.citations, model: demoLocalModel, outputFileId: null }
     },
-    reply: async (request) => {
-      await pause()
+    reply: async (request, signal) => {
+      await pause(signal)
       const text = draftReply(request.guidance, profileOf(request.profileId))
       const run = record('reply', `Reply: ${request.thread.slice(0, 60)}`, request.thread, text)
       return { runId: run.id, text, citations: [], model: demoLocalModel, outputFileId: null }
     },
-    translate: async (request) => {
-      await pause()
+    translate: async (request, signal) => {
+      await pause(signal)
       const text = describeDemoTranslation(request.text, request.targetLanguage)
       const run = record('translate', `Translation into ${request.targetLanguage}`, request.text, text)
       return { runId: run.id, text, citations: [], model: demoLocalModel, outputFileId: null }
     },
     reviewTemplates: async () => reviewTemplates,
-    review: async (request) => {
+    review: async (request, signal) => {
       const template = reviewTemplates.find((candidate) => candidate.id === request.templateId)
       if (template === undefined) throw missing('review template')
-      await pause()
+      await pause(signal)
       const text = reviewFromSentences(request.source, template)
       const run = record('review', `${template.name} review`, request.source, text)
       return { runId: run.id, text, citations: [], model: demoLocalModel, outputFileId: null }
     },
-    transcribe: async (file) => {
-      await pause()
+    transcribe: async (file, signal) => {
+      await pause(signal)
       const run = record('transcribe', `Transcript of ${file.name}`, file.name, demoTranscript)
       return { runId: run.id, text: demoTranscript }
     },
-    inspectForm: async (file, context) => {
+    inspectForm: async (file, context, signal) => {
+      await pause(signal)
       const profile = profileOf(context.profileId)
       return {
         formFileId: keepFile(file),

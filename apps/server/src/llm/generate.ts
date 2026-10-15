@@ -14,6 +14,7 @@ export type GenerateRequest = {
   messages: { role: 'user' | 'assistant'; content: string }[]
   maxTokens: number
   jsonSchema?: Record<string, unknown>
+  signal: AbortSignal
 }
 
 export type Models = {
@@ -38,6 +39,7 @@ export const generate = async (models: Models, request: GenerateRequest): Promis
     const text = await models.local.complete({
       messages,
       maxTokens: request.maxTokens,
+      signal: request.signal,
       ...(request.jsonSchema === undefined ? {} : { jsonSchema: request.jsonSchema }),
     })
     return { text, model: { kind: 'local', name: await localName(models.local), fallbackReason }, outbound }
@@ -45,7 +47,7 @@ export const generate = async (models: Models, request: GenerateRequest): Promis
 
   if (request.persona?.modelPreference !== 'remote') return runLocal(null, [])
 
-  const outcome = await models.remote.complete({ system: request.system, messages: request.messages, maxTokens: Math.max(request.maxTokens, 4096) })
+  const outcome = await models.remote.complete({ system: request.system, messages: request.messages, maxTokens: Math.max(request.maxTokens, 4096), signal: request.signal })
   if (outcome.ok) {
     return {
       text: outcome.text,

@@ -64,7 +64,18 @@ body {
 }
 
 .app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-3);
   padding: var(--space-5) var(--space-6) var(--space-2);
+  /* Stays in view on long pages, so a running operation can always be seen and stopped. */
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--color-panel-translucent);
+  backdrop-filter: saturate(180%) blur(20px);
 }
 
 .app-main {
@@ -191,4 +202,17 @@ body {
   .field-medium {
     width: 100%;
   }
+}
+
+.operations-indicator {
+  max-width: min(360px, 100%);
+}
+
+.running-operations {
+  max-width: 520px;
+}
+
+.document-preview {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
