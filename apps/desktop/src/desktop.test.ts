@@ -6,7 +6,7 @@ import { approvalPromptFor, parsePendingReply, parseStatusReply, requestsToAsk, 
 import { describeFailure } from './setup-messages.ts'
 import { trayEntries } from './tray-menu.ts'
 import { removeBundle } from './update-install.ts'
-import { assetNameFor, digestMatches, installKindFor, parseRelease, releaseTagFor, startCommandFor, updateFor } from './updates.ts'
+import { assetNameFor, digestMatches, installKindFor, parseRelease, releaseTagFor, startCommandFor, stopsVmOnQuit, updateFor } from './updates.ts'
 import { layoutViews, toolbarHeight } from './window-layout.ts'
 import { isAllowedRequestUrl, isOffeeUrl, isPermissionAllowed, pathWithHomebrew, progressAsLines } from './window-policy.ts'
 
@@ -194,6 +194,14 @@ describe('updating the app', () => {
     expect(installKindFor({ ...linux, execPath: '/home/someone/Offee-linux-x64/offee' })).toBe('release-page')
     expect(installKindFor({ ...linux, packaged: false, execPath: '/usr/bin/electron' })).toBe('source')
     expect(installKindFor({ ...linux, platform: 'win32', execPath: 'C:\\Offee\\Offee.exe' })).toBe('source')
+  })
+
+  it('leaves the VM running when the app quits only to restart into an update', () => {
+    expect(stopsVmOnQuit('running', true)).toBe(false)
+    expect(stopsVmOnQuit('running', false)).toBe(true)
+    expect(stopsVmOnQuit('failed', false)).toBe(true)
+    expect(stopsVmOnQuit('stopped', false)).toBe(false)
+    expect(stopsVmOnQuit('needs-setup', false)).toBe(false)
   })
 
   it('rebuilds the containers once after the app changed, not on every start', () => {

@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import type { AvailableUpdate, InstallKind, Release } from './types.ts'
+import type { AppPhase, AvailableUpdate, InstallKind, Release } from './types.ts'
 
 const repository = 'cnotv/offee'
 // The API's asset address, not the public download link: after the rolling release is
@@ -116,3 +116,14 @@ export const digestMatches = (expected: string, actualHex: string): boolean => e
  */
 export const startCommandFor = (builtCommit: string | null, buildCommit: string, packaged: boolean): 'update' | 'start' =>
   packaged && builtCommit !== buildCommit ? 'update' : 'start'
+
+/**
+ * Whether quitting the app stops the VM. A VM that was never created or is already stopped is
+ * left alone, and so is one the app quits only to restart into an update: the new app's
+ * `offee update` takes it over, and a stop running alongside would take it down under it.
+ * @param phase What the app was doing when it quit.
+ * @param restartingForUpdate Whether the app quits to relaunch into a newly installed version.
+ * @returns True when the VM should stop.
+ */
+export const stopsVmOnQuit = (phase: AppPhase, restartingForUpdate: boolean): boolean =>
+  !restartingForUpdate && phase !== 'needs-setup' && phase !== 'stopped'
