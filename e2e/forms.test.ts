@@ -34,7 +34,8 @@ test('fills a PDF form end to end with the local model', async ({ page, baseURL 
   await page.goto('/forms')
   await page.locator('input[type=file]').setInputFiles(formPath)
   const review = page.getByText('Check every value')
-  const failure = page.getByRole('alert')
+  // An error, or a form Offee found no place to fill in, ends the wait at once.
+  const failure = page.getByRole('alert').or(page.getByText('Offee found no place to fill in'))
   await expect(review.or(failure)).toBeVisible({ timeout: 60 * 60_000 })
   expect(await failure.isVisible() ? await failure.innerText() : '', 'Offee showed an error instead of the fields').toBe('')
   await test.info().attach('review', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' })
