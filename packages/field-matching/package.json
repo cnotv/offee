@@ -1,0 +1,19 @@
+{
+  "name": "@offee/field-matching",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/match-fields.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p .",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@offee/contracts": "workspace:*",
+    "vitest": "^3.2.7"
+  }
+}

@@ -7,6 +7,7 @@ COPY apps/server/package.json apps/server/
 COPY apps/gateway/package.json apps/gateway/
 COPY apps/web/package.json apps/web/
 COPY packages/contracts/package.json packages/contracts/
+COPY packages/field-matching/package.json packages/field-matching/
 RUN pnpm install --frozen-lockfile
 
 COPY . .
@@ -34,6 +35,7 @@ COPY --from=build /app/package.json ./
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/config ./config
 COPY --from=build /app/packages/contracts ./packages/contracts
+COPY --from=build /app/packages/field-matching ./packages/field-matching
 COPY --from=build /app/apps/server ./apps/server
 COPY --from=build /app/apps/gateway ./apps/gateway
 COPY --from=build /app/apps/web/dist ./apps/web/dist

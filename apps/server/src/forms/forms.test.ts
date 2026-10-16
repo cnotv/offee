@@ -4,7 +4,8 @@ import { describe, expect, it } from 'vitest'
 import type { Profile } from '@offee/contracts'
 import { createSigningCertificate } from './certificate.ts'
 import shippedAliasesFile from '../../../../config/form-field-aliases.json' with { type: 'json' }
-import { fieldAliasesSchema, matchFieldToKey, normalizeFieldName, suggestFromProfile } from './match-fields.ts'
+import { fieldAliasesSchema } from '@offee/field-matching'
+import { suggestFromProfile } from './match-fields.ts'
 import { decryptPdf, fillForm, readFormFields } from './pdf-form.ts'
 
 const aliases = {
@@ -50,19 +51,6 @@ const makeForm = async (): Promise<Uint8Array> => {
 }
 
 describe('matching fields to a profile', () => {
-  it('normalizes names across spelling and accents', () => {
-    expect(normalizeFieldName('E-Mail')).toBe('email')
-    expect(normalizeFieldName('Straße')).toBe('strasse')
-    expect(normalizeFieldName('Città')).toBe('citta')
-  })
-
-  it('prefers an exact alias, then the longest alias the name contains', () => {
-    expect(matchFieldToKey('Name', aliases)).toBe('fullName')
-    expect(matchFieldToKey('Company name', aliases)).toBe('organization')
-    expect(matchFieldToKey('Ort, Datum', aliases)).toBe('date')
-    expect(matchFieldToKey('Favourite colour', aliases)).toBeUndefined()
-  })
-
   it('answers occupation from the role, and leaves questions about birth to the model rather than answering them with today or the city', () => {
     const shippedAliases = fieldAliasesSchema.parse(shippedAliasesFile)
     const fields = ['Occupation', 'Date of birth', 'Place of birth', 'Geburtsdatum', 'Place and date'].map((name) => ({ name, kind: 'text' as const, options: [] }))

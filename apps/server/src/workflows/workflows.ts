@@ -16,7 +16,7 @@ import type {
 } from '@offee/contracts'
 import { textToDocx } from '../exports/docx-export.ts'
 import { createSigningCertificate } from '../forms/certificate.ts'
-import type { FieldAliases } from '../forms/match-fields.ts'
+import type { FieldAliases } from '@offee/field-matching'
 import { suggestFromProfile } from '../forms/match-fields.ts'
 import type { TextLine } from '../forms/flat-form.ts'
 import { addPlacedFields, fieldPlacementSchema, fieldPlacementsFromModelAnswer, readTextLines, usablePlacedFields } from '../forms/flat-form.ts'

@@ -2,27 +2,6 @@ import { z } from 'zod'
 
 // The API's answers, parsed before the UI uses them.
 
-export const profileSchema = z.object({
-  id: z.string(),
-  label: z.string(),
-  firstName: z.string(),
-  lastName: z.string(),
-  role: z.string(),
-  organization: z.string(),
-  email: z.string(),
-  phone: z.string(),
-  street: z.string(),
-  postalCode: z.string(),
-  city: z.string(),
-  country: z.string(),
-  languages: z.array(z.string()),
-  tone: z.string(),
-  facts: z.string(),
-  signatureImage: z.string().nullable(),
-  hasCertificate: z.boolean(),
-  createdAt: z.number(),
-})
-
 export const personaSchema = z.object({
   id: z.string(),
   name: z.string(),
