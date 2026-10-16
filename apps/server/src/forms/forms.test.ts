@@ -67,6 +67,33 @@ describe('matching fields to a profile', () => {
     const fields = ['Occupation', 'Date of birth', 'Place of birth', 'Geburtsdatum', 'Place and date'].map((name) => ({ name, kind: 'text' as const, options: [] }))
     expect(suggestFromProfile(fields, profile, shippedAliases, '15/10/2026').map((suggestion) => suggestion.value)).toEqual(['Engineer', '', '', '', 'London, 15/10/2026'])
   })
+
+  it('fills the tax return labels that are the profile, and leaves death, birth, the spouse and a foreign address to the model', () => {
+    const shippedAliases = fieldAliasesSchema.parse(shippedAliasesFile)
+    const resident = { ...profile, street: 'Hauptstraße 1', postalCode: '10115', city: 'Berlin', country: 'Deutschland' }
+    const valueFor = (label: string): string => suggestFromProfile([{ name: label, kind: 'text', options: [] }], resident, shippedAliases, '15/10/2026')[0]?.value ?? ''
+    expect(['Name', 'Vorname', 'Ausgeübter Beruf', 'Straße (derzeitige Adresse)', 'Postleitzahl (Inland)', 'Wohnort', 'Ort, Datum'].map(valueFor)).toEqual([
+      'Ada Lovelace',
+      'Ada',
+      'Engineer',
+      'Hauptstraße 1',
+      '10115',
+      'Berlin',
+      'Berlin, 15/10/2026',
+    ])
+    const notTheProfile = [
+      'im Sterbefall: Sterbedatum',
+      'Geburtsdatum',
+      'Adressergänzung',
+      'Postleitzahl (Ausland)',
+      'Staat (falls Anschrift im Ausland)',
+      'Name 2',
+      'Vorname 2',
+      'Abweichende Anschrift der Ehefrau oder Person B',
+      'Person B: Vorname',
+    ]
+    expect(notTheProfile.map(valueFor)).toEqual(notTheProfile.map(() => ''))
+  })
 })
 
 describe('filling and signing a PDF form', () => {
