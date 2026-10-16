@@ -1,6 +1,0 @@
-# The website is built for GitHub Pages under /offee/, so its 404 page asks for /offee/... paths.
-/offee/*  /:splat  200
-
-# The demo app is a single page app: every route under /demo/ loads its index.
-/demo     /demo/  301
-/demo/*   /demo/index.html  200

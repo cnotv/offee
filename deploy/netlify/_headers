@@ -1,8 +1,0 @@
-# Netlify headers for the one site that holds the website at the root and the demo app under /demo/.
-/*
-  Referrer-Policy: no-referrer
-  X-Content-Type-Options: nosniff
-
-# The demo app runs no inline script, so it keeps the strict policy it had on its own.
-/demo/*
-  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'

@@ -1,0 +1,40 @@
+# One Netlify site, built from Git: the project website at the root and the UI under /demo/. With no
+# Offee server behind it, the UI runs in demo mode: sample data and canned answers that live in the
+# browser tab, so nothing typed there is sent. A deploy replaces the whole site, so every build
+# assembles both parts. GitHub Pages stays the website's production home (pages.yml).
+[build]
+  command = "pnpm --filter @offee/web build --base /demo/ && mkdir -p _netlify && cp -R site/. _netlify/ && cp -R docs/media _netlify/media && cp -R apps/web/dist _netlify/demo"
+  publish = "_netlify"
+  # Exit 0 skips the build: only changes to the website, the UI or what the UI is built from deploy.
+  ignore = "git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF -- site docs/media apps/web packages/contracts package.json pnpm-lock.yaml pnpm-workspace.yaml netlify.toml"
+
+[build.environment]
+  NODE_VERSION = "24"
+  VITE_DEMO_MODE = "1"
+  # The Mac app's Electron is a dependency of the workspace, not of the UI.
+  ELECTRON_SKIP_BINARY_DOWNLOAD = "1"
+
+# The website is built for GitHub Pages under /offee/, so its 404 page asks for /offee/... paths.
+[[redirects]]
+  from = "/offee/*"
+  to = "/:splat"
+  status = 200
+
+# The demo app is a single page app: every route under /demo/ loads its index.
+[[redirects]]
+  from = "/demo/*"
+  to = "/demo/index.html"
+  status = 200
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Referrer-Policy = "no-referrer"
+    X-Content-Type-Options = "nosniff"
+
+# The demo app runs no inline script, so it keeps its strict policy; the website's inline scripts
+# would not run under it.
+[[headers]]
+  for = "/demo/*"
+  [headers.values]
+    Content-Security-Policy = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
