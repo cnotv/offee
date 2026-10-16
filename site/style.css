@@ -125,8 +125,7 @@ h3 {
 .hero {
   display: grid;
   gap: 2.5rem;
-  /* Top, so opening the install notes does not move the video. */
-  align-items: start;
+  align-items: center;
   padding: 2.5rem 0 4rem;
 }
 
@@ -222,11 +221,17 @@ figure.window figcaption {
   color: var(--muted);
 }
 
-/* Feature tour: one clip on stage, the features as tabs under it, the active one filling as its clip plays. */
+/* Feature tour: one clip on stage, the features as tabs beside it, the active one filling as its clip plays. */
 .tour {
   display: grid;
   gap: 1.25rem;
   align-items: start;
+}
+
+@media (min-width: 60rem) {
+  .tour {
+    grid-template-columns: 7fr 3fr;
+  }
 }
 
 .tour-stage {
