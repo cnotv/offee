@@ -11,8 +11,9 @@ export default defineConfig({
   reporter: [['list'], ['html', { open: 'never' }]],
   use: { baseURL: appUrl, acceptDownloads: true, trace: 'retain-on-failure' },
   webServer: [
-    // The first run downloads the model, several gigabytes.
-    { command: 'bin/offee-dev model', url: `${modelUrl}/health`, timeout: 60 * 60_000, reuseExistingServer: true },
+    // A hosted model when one is named; otherwise the local one, which the first run downloads,
+    // several gigabytes.
+    { command: process.env.OFFEE_DEV_HOSTED_URL === undefined ? 'bin/offee-dev model' : 'bin/offee-dev hosted', url: `${modelUrl}/health`, timeout: 60 * 60_000, reuseExistingServer: true },
     { command: 'bin/offee-dev app', url: `${appUrl}/api/status`, timeout: 5 * 60_000, reuseExistingServer: true },
   ],
 })
