@@ -48,6 +48,7 @@ a {
 a:focus-visible,
 button:focus-visible,
 summary:focus-visible,
+pre:focus-visible,
 input:focus-visible + label {
   outline: 3px solid var(--link);
   outline-offset: 3px;
@@ -347,6 +348,26 @@ section {
 #open:checked + label {
   background: var(--open);
   color: var(--sheet);
+}
+
+/* The server's setup: the same pill switch, one command per way in. */
+.reach {
+  /* A fieldset grows to its widest line; this lets a long command scroll inside its box instead. */
+  min-width: 0;
+}
+
+.reach input:checked + label {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.reach pre {
+  display: none;
+}
+
+.reach:has(#reach-tailscale:checked) pre.tailscale,
+.reach:has(#reach-ssh:checked) pre.ssh {
+  display: block;
 }
 
 .panel {

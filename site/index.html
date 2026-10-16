@@ -290,20 +290,25 @@
           <div class="prose">
             <h2>For a team, on a server you own</h2>
             <p>One Offee on your Linux server, opened from everyone's laptop.</p>
-            <ul>
-              <li><strong>Private.</strong> Reached only through <a href="https://tailscale.com">Tailscale</a> or an SSH tunnel; Offee opens no port to the internet.</li>
-              <li><strong>Shared.</strong> No user accounts: everyone with access sees every document.</li>
-              <li><strong>On the server.</strong> Your documents stay there, under its disk encryption.</li>
-            </ul>
-            <details class="extra">
-              <summary>Set it up</summary>
-              <div class="extra-body">
-                <p>Linux with virtualization, Colima and Docker, 16 GB of memory, 25 GB of disk, and SSH access. From your laptop:</p>
-                <pre><code>./bin/offee remote me@server deploy
-./bin/offee remote me@server tailscale on</code></pre>
-                <p>No Tailscale? <code>./bin/offee remote me@server tunnel</code> uses SSH. The <a href="https://github.com/cnotv/offee#on-a-server-of-your-own">README</a> has the rest.</p>
+          </div>
+          <figure class="diagram">
+            <div class="diagram-scroll"><img src="media/diagrams/server.svg" width="960" height="440" loading="lazy" alt="The team's laptops open Offee in a browser and reach the server only through a private network: Tailscale over HTTPS for your own devices, or an SSH tunnel. On the server, Offee runs in a Linux VM and answers only on the server's own 127.0.0.1; profiles, documents, the run log, the switch and the API key all stay there, under the server's disk encryption. There are no user accounts, so everyone with access sees everything. The internet has no way in: no port is open for Offee and Tailscale Funnel is refused."></div>
+          </figure>
+          <div class="prose">
+            <h3>Set it up</h3>
+            <p>Linux with virtualization, Colima and Docker, 16 GB of memory, 25 GB of disk, and SSH access. From a copy of the source code on your laptop, one line sets Offee up on the server and connects you:</p>
+            <fieldset class="switch reach">
+              <legend>How you reach it</legend>
+              <div class="positions">
+                <input type="radio" name="reach" id="reach-tailscale" checked>
+                <label for="reach-tailscale">Tailscale</label>
+                <input type="radio" name="reach" id="reach-ssh">
+                <label for="reach-ssh">SSH tunnel</label>
               </div>
-            </details>
+              <pre class="tailscale" tabindex="0"><code>./bin/offee remote me@server deploy &amp;&amp; ./bin/offee remote me@server tailscale on</code></pre>
+              <pre class="ssh" tabindex="0"><code>./bin/offee remote me@server deploy &amp;&amp; ./bin/offee remote me@server tunnel</code></pre>
+            </fieldset>
+            <p>The <a href="https://github.com/cnotv/offee#on-a-server-of-your-own">README</a> has the rest.</p>
           </div>
         </section>
       </main>
