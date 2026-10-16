@@ -6,6 +6,17 @@ const context = { profileId: 'profile-work', personaId: null }
 const running = new AbortController().signal
 
 describe('createDemoApi', () => {
+  it('lists the stored data and deletes one item or everything', async () => {
+    const api = createDemoApi()
+    const items = await api.storedData()
+    expect(new Set(items.map((item) => item.kind))).toEqual(new Set(['profile', 'persona', 'document', 'run']))
+    await api.deleteStoredItems([{ kind: 'profile', id: 'profile-work' }, ...items.filter((item) => item.kind === 'run').map(({ kind, id }) => ({ kind, id }))])
+    expect((await api.profiles()).map((profile) => profile.id)).not.toContain('profile-work')
+    expect(await api.runs()).toEqual([])
+    await api.deleteAllStoredData()
+    expect(await api.storedData()).toEqual([])
+  })
+
   it('answers a chat from the documents the profile may use and records the run', async () => {
     const api = createDemoApi()
     const answer = await api.chat({ ...context, conversationId: sampleConversationId, history: [], message: 'Do flights need approval?' }, running)
@@ -32,8 +43,8 @@ describe('createDemoApi', () => {
     const api = createDemoApi()
     const inspection = await api.inspectForm(new File(['%PDF'], 'travel-request.pdf', { type: 'application/pdf' }), context, running)
     expect(inspection.suggestions.find((suggestion) => suggestion.name === 'City')).toEqual({ name: 'City', value: 'Berlin', source: 'profile' })
-    const work = await api.fillForm({ formFileId: inspection.formFileId, profileId: 'profile-work', values: inspection.suggestions, sign: true })
-    const personal = await api.fillForm({ formFileId: inspection.formFileId, profileId: 'profile-personal', values: inspection.suggestions, sign: true })
+    const work = await api.fillForm({ formFileId: inspection.formFileId, profileId: 'profile-work', values: inspection.suggestions, placedFields: inspection.placedFields, sign: true })
+    const personal = await api.fillForm({ formFileId: inspection.formFileId, profileId: 'profile-personal', values: inspection.suggestions, placedFields: inspection.placedFields, sign: true })
     expect([work.signed, personal.signed]).toEqual([true, false])
     expect((await api.run(work.runId)).title).toBe('Filled and signed travel-request.pdf')
   })

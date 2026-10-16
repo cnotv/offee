@@ -3,6 +3,7 @@ export type Settings = {
   configDirectory: string
   webDistDirectory: string
   port: number
+  listenHost: string
   allowedHostNames: string[]
   chatModelUrl: string
   transcriptionUrl: string
@@ -22,6 +23,9 @@ export const readSettings = (environment: Record<string, string | undefined>, wo
   configDirectory: environment.OFFEE_CONFIG_DIR ?? `${workspaceRoot}config`,
   webDistDirectory: environment.OFFEE_WEB_DIST ?? `${workspaceRoot}apps/web/dist`,
   port: Number(environment.OFFEE_PORT ?? '8470'),
+  // Inside its container the app must answer the edge on the internal network; a development
+  // run on the host listens on loopback only.
+  listenHost: environment.OFFEE_LISTEN_HOST ?? '0.0.0.0',
   allowedHostNames: (environment.OFFEE_ALLOWED_HOSTS ?? 'localhost,127.0.0.1').split(',').map((name) => name.trim()),
   chatModelUrl: environment.OFFEE_CHAT_MODEL_URL ?? 'http://inference:8080',
   transcriptionUrl: environment.OFFEE_TRANSCRIPTION_URL ?? 'http://transcription:8090',

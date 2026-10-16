@@ -45,19 +45,31 @@ export const profileValueFor = (profile: Profile, key: string, today: string): s
   return values[key]
 }
 
+// Not a profile key: terms that make a field someone else's, or a date that is not today. A
+// field about a death, a birth, a spouse or a foreign address contains aliases such as "datum"
+// or "anschrift", yet the profile never answers it.
+const leaveToModelKey = 'leaveToModel'
+
+// A label seen again on the same form gets a number ("Vorname 2", see usablePlacedFields), and
+// the repeat belongs to another person or entry, like the spouse block of a tax return.
+const repeatedLabel = /\s([2-9]|\d{2,})$/
+
 /**
  * Finds the profile key a field asks for: an exact alias wins, otherwise the longest alias
  * the name contains, so "companyname" goes to the organization and not to the name.
  * @param fieldName The field's name.
- * @param aliases The aliases per profile key.
- * @returns The key, or undefined when nothing matches.
+ * @param aliases The aliases per profile key, and the terms that leave a field to the model.
+ * @returns The key, or undefined when nothing matches or the field is left to the model.
  */
 export const matchFieldToKey = (fieldName: string, aliases: FieldAliases): string | undefined => {
   const normalized = normalizeFieldName(fieldName)
-  if (normalized === '') return undefined
-  const candidates = Object.entries(aliases).flatMap(([key, names]) =>
-    names.filter((alias) => normalized === alias || (alias.length >= 4 && normalized.includes(alias))).map((alias) => ({ key, alias })),
-  )
+  if (normalized === '' || repeatedLabel.test(fieldName.trim())) return undefined
+  if ((aliases[leaveToModelKey] ?? []).some((term) => normalized.includes(term))) return undefined
+  const candidates = Object.entries(aliases)
+    .filter(([key]) => key !== leaveToModelKey)
+    .flatMap(([key, names]) =>
+      names.filter((alias) => normalized === alias || (alias.length >= 4 && normalized.includes(alias))).map((alias) => ({ key, alias })),
+    )
   const exact = candidates.find((candidate) => candidate.alias === normalized)
   if (exact !== undefined) return exact.key
   return candidates.toSorted((left, right) => right.alias.length - left.alias.length)[0]?.key

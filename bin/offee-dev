@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+# Runs Offee from this checkout against llama.cpp on the host, with the model and context size
+# the VM uses, so a change can be tried end to end before it ships. Development only: nothing
+# here is sealed off the way `offee setup` is, and both servers listen on loopback alone.
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+chat_model="${OFFEE_CHAT_MODEL:-ggml-org/gemma-4-E4B-it-GGUF}"
+context_size="${OFFEE_CONTEXT_SIZE:-16384}"
+model_port="${OFFEE_DEV_MODEL_PORT:-18080}"
+app_port="${OFFEE_DEV_PORT:-18470}"
+
+usage() {
+  cat <<USAGE
+Usage: bin/offee-dev model | app | e2e [playwright options]
+  model  serve $chat_model with llama.cpp on 127.0.0.1:$model_port (downloads it the first time)
+  app    build the UI and run Offee from this checkout on 127.0.0.1:$app_port, data in .data-dev
+  e2e    run the Playwright tests in e2e/ against both, starting whichever is not running
+Set OFFEE_E2E_FORM to a PDF to try that form instead of the sample.
+USAGE
+}
+
+case "${1:-}" in
+  model)
+    command -v llama-server >/dev/null || { echo "offee-dev: install llama.cpp first: brew install llama.cpp" >&2; exit 1; }
+    exec llama-server -hf "$chat_model" --no-mmproj --host 127.0.0.1 --port "$model_port" --ctx-size "$context_size" --jinja
+    ;;
+  app)
+    pnpm --dir "$repo_root" build
+    OFFEE_DATA_DIR="$repo_root/.data-dev" OFFEE_PORT="$app_port" OFFEE_LISTEN_HOST=127.0.0.1 \
+      OFFEE_CHAT_MODEL_URL="http://127.0.0.1:$model_port" \
+      exec node --disable-warning=ExperimentalWarning "$repo_root/apps/server/src/main.ts"
+    ;;
+  e2e)
+    shift
+    cd "$repo_root"
+    OFFEE_DEV_MODEL_PORT="$model_port" OFFEE_DEV_PORT="$app_port" exec pnpm exec playwright test "$@"
+    ;;
+  help|--help|-h) usage ;;
+  *) usage >&2; exit 1 ;;
+esac

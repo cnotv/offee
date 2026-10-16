@@ -3,14 +3,14 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Offee: a paperwork helper that keeps your documents on your computer</title>
-    <meta name="description" content="Offee fills forms, drafts replies, translates and sums up meetings with an AI that runs on your own computer. Your documents never leave it unless you say so.">
+    <title>Offee: a self-hosted paperwork helper for your computer or your team's server</title>
+    <meta name="description" content="Offee fills forms, drafts replies, translates and sums up meetings with an AI that runs on your own computer, or on a server your team owns. Your documents never leave it unless you say so.">
     <link rel="canonical" href="https://cnotv.github.io/offee/">
     <link rel="icon" href="favicon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="style.css">
     <meta property="og:type" content="website">
-    <meta property="og:title" content="Offee: a paperwork helper that keeps your documents on your computer">
-    <meta property="og:description" content="Fill forms, draft replies, translate and sum up meetings with an AI that runs on your own computer.">
+    <meta property="og:title" content="Offee: a self-hosted paperwork helper for your computer or your team's server">
+    <meta property="og:description" content="Fill forms, draft replies, translate and sum up meetings with an AI that runs on your own computer or your own server.">
     <meta property="og:url" content="https://cnotv.github.io/offee/">
     <meta property="og:image" content="https://cnotv.github.io/offee/og-image.png">
     <meta property="og:image:alt" content="Offee filling a tenant form from a profile">
@@ -20,11 +20,14 @@
         "@context": "https://schema.org",
         "@type": "SoftwareApplication",
         "name": "Offee",
-        "description": "An office assistant that runs on your own machine, sealed off from it: fills forms, drafts replies, translates and writes reviews with local models.",
+        "description": "A self-hosted office assistant that runs on your own computer or on a server you own, sealed off from it: fills forms, drafts replies, translates and writes reviews with local models.",
         "applicationCategory": "BusinessApplication",
         "operatingSystem": "macOS 13 or later on Apple Silicon, Linux on x64 or arm64",
         "url": "https://cnotv.github.io/offee/",
-        "downloadUrl": "https://github.com/cnotv/offee/releases",
+        "downloadUrl": [
+          "https://github.com/cnotv/offee/releases/download/mac-preview/Offee-arm64.dmg",
+          "https://github.com/cnotv/offee/releases/download/linux-preview/Offee-linux-x64.deb"
+        ],
         "codeRepository": "https://github.com/cnotv/offee"
       }
     </script>
@@ -32,36 +35,154 @@
   <body>
     <div class="wrap">
       <header class="top">
-        <a class="mark" href="./">Offee</a>
-        <a href="https://github.com/cnotv/offee">Source code</a>
+        <a class="mark" href="./"><img src="favicon.svg" alt="" width="32" height="32">Offee</a>
+        <a class="github" href="https://github.com/cnotv/offee" aria-label="Source code on GitHub">
+          <!-- The GitHub mark from Octicons, MIT licence. -->
+          <svg viewBox="0 0 24 24" width="28" height="28" aria-hidden="true"><path d="M12.5.75C6.146.75 1 5.896 1 12.25c0 5.089 3.292 9.387 7.863 10.91.575.101.79-.244.79-.546 0-.273-.014-1.178-.014-2.142-2.889.532-3.636-.704-3.866-1.35-.13-.331-.69-1.352-1.18-1.625-.402-.216-.977-.748-.014-.762.906-.014 1.553.834 1.769 1.179 1.035 1.74 2.688 1.25 3.349.948.1-.747.402-1.25.733-1.538-2.559-.287-5.232-1.279-5.232-5.678 0-1.25.445-2.285 1.178-3.09-.115-.288-.517-1.467.115-3.048 0 0 .963-.302 3.163 1.179.92-.259 1.897-.388 2.875-.388.977 0 1.955.13 2.875.388 2.2-1.495 3.162-1.179 3.162-1.179.633 1.581.23 2.76.115 3.048.733.805 1.179 1.825 1.179 3.09 0 4.413-2.688 5.39-5.247 5.678.417.36.776 1.05.776 2.128 0 1.538-.014 2.774-.014 3.162 0 .302.216.662.79.547C20.709 21.637 24 17.324 24 12.25 24 5.896 18.854.75 12.5.75Z"/></svg>
+        </a>
       </header>
 
       <main>
         <div class="hero">
           <div>
-            <h1>Your paperwork, done on your own computer.</h1>
+            <h1>Your paperwork, done on machines you own.</h1>
             <p class="lead">
-              Offee fills in forms, drafts replies, translates letters and sums up meetings. The AI doing it runs on your Mac or Linux PC, so your passport scan, payslip or
-              contract never goes to someone else's server.
+              Offee fills in forms, drafts replies, translates letters and sums up meetings. It is self-hosted: the AI doing it runs on your own computer if you work
+              for yourself, or on a server you own if you work as a team. Your passport scan, payslip or contract never goes to someone else's server.
             </p>
-            <div class="actions">
-              <a class="button" href="https://github.com/cnotv/offee/releases/tag/mac-preview">Download the Mac preview</a>
-              <a class="button quiet" href="#linux">Get it for Linux</a>
-              <a class="button quiet" href="#how">How it works</a>
+            <div class="downloads">
+              <a class="download" href="https://github.com/cnotv/offee/releases/download/mac-preview/Offee-arm64.dmg">
+                <svg viewBox="0 0 48 48" aria-hidden="true"><rect x="9" y="10" width="30" height="20" rx="2"/><path d="M4 36h40l-3 3H7z"/></svg>
+                <span><strong><span class="visually-hidden">Download for </span>Mac</strong> <span>Apple Silicon</span></span>
+              </a>
+              <a class="download" href="https://github.com/cnotv/offee/releases/download/linux-preview/Offee-linux-x64.deb">
+                <svg viewBox="0 0 48 48" aria-hidden="true"><rect x="5" y="8" width="38" height="26" rx="2"/><path d="M12 17l5 4-5 4M21 26h8M19 34l-2 6M29 34l2 6M14 40h20"/></svg>
+                <span><strong><span class="visually-hidden">Download for </span>Linux</strong> <span>Debian, Ubuntu</span></span>
+              </a>
             </div>
-            <p class="small">The source code is public. Needs a Mac with Apple Silicon or a Linux PC (x64 or arm64), and 16 GB of memory. An early test build.</p>
+            <details class="extra">
+              <summary>What you need, and how to install</summary>
+              <div class="extra-body">
+                <p>
+                  A Mac with Apple Silicon and macOS 13 or later, or a Linux PC on x64 or arm64 with virtualization on. 16 GB of memory and 25 GB of free disk.
+                  The source code is public; this is an early test build.
+                </p>
+                <h2>On a Mac</h2>
+                <ol class="steps">
+                  <li>Open <code>Offee-arm64.dmg</code> and drag Offee to Applications.</li>
+                  <li>Open it and choose Set up Offee. It downloads the AI (about 10 GB) once, then opens. From then on it needs no internet.</li>
+                </ol>
+                <h2>On Linux</h2>
+                <ol class="steps">
+                  <li>Make sure virtualization is on (<code>/dev/kvm</code> exists), then install <a href="https://colima.run">Colima</a> and the Docker command line tools with Compose.</li>
+                  <li>On Debian or Ubuntu, install the package with <code>sudo apt install ./Offee-linux-x64.deb</code>. ARM computers and other distributions take another package from the <a href="https://github.com/cnotv/offee/releases/tag/linux-preview">Linux preview release</a>: <code>Offee-linux-arm64.deb</code>, or a <code>.tar.gz</code> to unpack as the <a href="https://github.com/cnotv/offee#the-linux-app">README</a> explains.</li>
+                  <li>Open Offee from your applications and choose Set up Offee. If your desktop shows no tray icon, open Offee again to bring its window back.</li>
+                </ol>
+              </div>
+            </details>
+            <a class="download quiet" href="#server">
+              <svg viewBox="0 0 48 48" aria-hidden="true"><rect x="8" y="7" width="32" height="14" rx="2"/><rect x="8" y="27" width="32" height="14" rx="2"/><path d="M14 14h2M14 34h2M24 14h10M24 34h10"/></svg>
+              <span><strong>For a team: run it on a server you own</strong> <span>Reached through Tailscale or an SSH tunnel</span></span>
+            </a>
           </div>
-          <figure class="window">
-            <video id="demo" muted loop playsinline controls preload="metadata" width="1280" height="800" poster="media/offee-fill-a-form.png" aria-label="Offee reads a scanned personal data sheet into a profile, then fills a tenant form from that profile.">
-              <source src="media/offee-fill-a-form.mp4" type="video/mp4">
-            </video>
-            <script>
-              // Plays on its own unless the visitor asked for less motion; the controls pause it.
-              if (!matchMedia('(prefers-reduced-motion: reduce)').matches) document.getElementById('demo').play().catch(() => {})
-            </script>
-            <figcaption>A scan is read into a profile, then a tenant form is filled from it. Recorded on a Mac with the real app and its local model; the two waits for the model, about 5 and 1½ minutes, are cut and marked. The person is made up.</figcaption>
-          </figure>
         </div>
+
+        <section id="does">
+          <h2>What it does today</h2>
+          <div class="tour">
+            <div class="tour-stage" role="tabpanel" id="tour-panel" aria-labelledby="tour-profile">
+              <video muted playsinline controls preload="metadata" width="1280" height="800" src="media/clips/profile.mp4" poster="media/clips/profile.webp" aria-label="A scanned personal data sheet is read into a new profile."></video>
+              <button type="button" class="tour-pause" aria-label="Pause the clips" aria-pressed="false" hidden>
+                <svg class="icon-pause" viewBox="0 0 16 16" aria-hidden="true"><rect x="3" y="2" width="3.5" height="12" rx="1"/><rect x="9.5" y="2" width="3.5" height="12" rx="1"/></svg>
+                <svg class="icon-play" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2.5v11a1 1 0 0 0 1.5.86l9-5.5a1 1 0 0 0 0-1.72l-9-5.5A1 1 0 0 0 4 2.5z"/></svg>
+              </button>
+            </div>
+            <div class="tour-tabs" role="tablist" aria-label="What Offee does" aria-orientation="vertical">
+              <button type="button" role="tab" id="tour-profile" aria-controls="tour-panel" aria-selected="true" tabindex="0" data-clip="profile" data-alt="A scanned personal data sheet is read into a new profile.">
+                <strong>Read a document into a profile</strong>
+                <span>An ID, a CV or a scan: your details land in a profile for you to check.</span>
+                <span class="tour-progress" aria-hidden="true"></span>
+              </button>
+              <button type="button" role="tab" id="tour-form" aria-controls="tour-panel" aria-selected="false" tabindex="-1" data-clip="form" data-alt="A tenant form is filled from the profile and saved as a PDF.">
+                <strong>Fill and sign forms</strong>
+                <span>Pick who you are; Offee fills the PDF, you check each value, it saves and signs.</span>
+                <span class="tour-progress" aria-hidden="true"></span>
+              </button>
+              <button type="button" role="tab" id="tour-reply" aria-controls="tour-panel" aria-selected="false" tabindex="-1" data-clip="reply" data-alt="A reply to a meeting invitation is drafted from one line of instructions.">
+                <strong>Reply to emails and chats</strong>
+                <span>A draft in your name and tone, based on your own documents.</span>
+                <span class="tour-progress" aria-hidden="true"></span>
+              </button>
+              <button type="button" role="tab" id="tour-translate" aria-controls="tour-panel" aria-selected="false" tabindex="-1" data-clip="translate" data-alt="A short English letter is translated into German.">
+                <strong>Translate</strong>
+                <span>A whole document, keeping the names, numbers and terms you care about.</span>
+                <span class="tour-progress" aria-hidden="true"></span>
+              </button>
+              <button type="button" role="tab" id="tour-review" aria-controls="tour-panel" aria-selected="false" tabindex="-1" data-clip="review" data-alt="Meeting notes become a summary with decisions and action items.">
+                <strong>Sum up a meeting</strong>
+                <span>From notes or a recording: a summary, the decisions, who does what.</span>
+                <span class="tour-progress" aria-hidden="true"></span>
+              </button>
+              <button type="button" role="tab" id="tour-run-log" aria-controls="tour-panel" aria-selected="false" tabindex="-1" data-clip="run-log" data-alt="A run in the log shows its input, its output and that nothing left the machine.">
+                <strong>See what it did</strong>
+                <span>Every task is logged: what went in, which AI answered, whether anything left.</span>
+                <span class="tour-progress" aria-hidden="true"></span>
+              </button>
+            </div>
+          </div>
+          <script>
+            // One clip at a time: each plays while the section is on screen and hands over to the next when it ends.
+            // A visitor who asked for less motion starts paused; the button pauses or resumes for anyone.
+            {
+              const tour = document.querySelector('.tour')
+              const stage = tour.querySelector('.tour-stage')
+              const video = stage.querySelector('video')
+              const pause = stage.querySelector('.tour-pause')
+              const tabs = [...tour.querySelectorAll('[role=tab]')]
+              let onScreen = false
+              const paused = () => pause.getAttribute('aria-pressed') === 'true'
+              const run = () => (onScreen && !paused() ? video.play().catch(() => {}) : video.pause())
+              const select = (tab) => {
+                tabs.forEach((other) => {
+                  other.setAttribute('aria-selected', String(other === tab))
+                  other.tabIndex = other === tab ? 0 : -1
+                  other.style.setProperty('--progress', '0')
+                })
+                stage.setAttribute('aria-labelledby', tab.id)
+                video.poster = `media/clips/${tab.dataset.clip}.webp`
+                video.src = `media/clips/${tab.dataset.clip}.mp4`
+                video.setAttribute('aria-label', tab.dataset.alt)
+                run()
+              }
+              const current = () => tabs.findIndex((tab) => tab.getAttribute('aria-selected') === 'true')
+              const step = (by) => tabs[(current() + by + tabs.length) % tabs.length]
+              video.controls = false
+              pause.hidden = false
+              pause.setAttribute('aria-pressed', String(matchMedia('(prefers-reduced-motion: reduce)').matches))
+              tabs.forEach((tab) => tab.addEventListener('click', () => select(tab)))
+              tour.querySelector('[role=tablist]').addEventListener('keydown', (event) => {
+                const by = { ArrowDown: 1, ArrowRight: 1, ArrowUp: -1, ArrowLeft: -1 }[event.key]
+                if (!by) return
+                event.preventDefault()
+                const next = step(by)
+                select(next)
+                next.focus()
+              })
+              pause.addEventListener('click', () => {
+                pause.setAttribute('aria-pressed', String(!paused()))
+                pause.setAttribute('aria-label', paused() ? 'Play the clips' : 'Pause the clips')
+                run()
+              })
+              video.addEventListener('timeupdate', () => tabs[current()].style.setProperty('--progress', String(video.currentTime / video.duration || 0)))
+              video.addEventListener('ended', () => select(step(1)))
+              new IntersectionObserver(([entry]) => {
+                onScreen = entry.isIntersecting
+                run()
+              }, { threshold: 0.5 }).observe(stage)
+            }
+          </script>
+          <p class="small">The first two clips use the real local model with its waits cut; the others use a stand-in model, so their answers are canned. All are sped up.</p>
+        </section>
 
         <section id="how">
           <h2>How it works</h2>
@@ -121,7 +242,7 @@
                 <tr>
                   <th scope="row">Where your documents go</th>
                   <td>To the company's servers, under its rules, sometimes used to train its next model.</td>
-                  <td>Nowhere. They stay on your computer unless you let one request out.</td>
+                  <td>Nowhere. They stay on your computer, or your team's server, unless you let one request out.</td>
                 </tr>
                 <tr>
                   <th scope="row">What it knows</th>
@@ -152,43 +273,9 @@
           </p>
         </section>
 
-        <section id="does">
-          <div class="prose">
-            <h2>What it does today</h2>
-            <h3>Fill and sign forms</h3>
-            <p>Open a PDF form and pick who you are filling it as. Offee fills in what it knows, you check each value, and it saves the PDF, signed if you want.</p>
-            <h3>Read a document into a profile</h3>
-            <p>Give it an ID, a CV or a scan of one, and your details land in a profile for you to check, ready for the next form.</p>
-            <h3>Reply to emails and chats</h3>
-            <p>Drop in a thread and say what you want to answer. You get a draft in your name and tone, based on your own documents.</p>
-            <h3>Translate</h3>
-            <p>A whole document, paragraph by paragraph, keeping the names, numbers and terms you care about.</p>
-            <h3>Sum up a meeting</h3>
-            <p>From notes or a recording: a summary, the decisions, and who does what by when.</p>
-          </div>
-          <figure class="window" style="max-width: 52rem; margin-top: 2rem">
-            <video controls preload="none" width="1280" height="800" poster="media/offee-features.png">
-              <source src="media/offee-features.mp4" type="video/mp4">
-            </video>
-            <figcaption>A 70 second tour of every page, recorded against a stand-in model, so the answers there are canned.</figcaption>
-          </figure>
-        </section>
-
         <section id="get">
-          <h2>Get it</h2>
-          <h3>On a Mac</h3>
-          <ol class="steps">
-            <li>Download <code>Offee-arm64.dmg</code> from the <a href="https://github.com/cnotv/offee/releases/tag/mac-preview">Mac preview release</a> and drag Offee to Applications.</li>
-            <li>Open it and choose Set up Offee. It downloads the AI (about 10 GB) once, then opens. From then on it needs no internet.</li>
-          </ol>
-          <h3 id="linux">On Linux</h3>
-          <ol class="steps">
-            <li>Make sure virtualization is on (<code>/dev/kvm</code> exists), then install <a href="https://colima.run">Colima</a> and the Docker command line tools with Compose.</li>
-            <li>Download the package for your computer from the <a href="https://github.com/cnotv/offee/releases/tag/linux-preview">Linux preview release</a>: <code>Offee-linux-x64</code> for most PCs, <code>Offee-linux-arm64</code> for ARM ones.</li>
-            <li>On Debian or Ubuntu, install the <code>.deb</code> with <code>sudo apt install ./Offee-linux-x64.deb</code>. On other distributions, unpack the <code>.tar.gz</code> and follow the <a href="https://github.com/cnotv/offee#the-linux-app">README</a>.</li>
-            <li>Open Offee from your applications and choose Set up Offee. If your desktop shows no tray icon, open Offee again to bring its window back.</li>
-          </ol>
-          <p class="prose">Then create a profile, or let Offee read one from a document, and try a form. Two made up documents to practise with are in <a href="https://github.com/cnotv/offee/tree/main/apps/web/public/samples">the samples folder</a>, and the app offers them with one click.</p>
+          <h2>Getting started</h2>
+          <p class="prose">Once Offee is set up, create a profile, or let Offee read one from a document, and try a form. Two made up documents to practise with are in <a href="https://github.com/cnotv/offee/tree/main/apps/web/public/samples">the samples folder</a>, and the app offers them with one click.</p>
           <details class="extra">
             <summary>What gets installed, and how much space it takes</summary>
             <figure class="diagram">
@@ -196,6 +283,35 @@
             </figure>
           </details>
           <p class="prose small">Prefer the terminal? The <a href="https://github.com/cnotv/offee#from-the-terminal">README</a> has the commands.</p>
+        </section>
+
+        <section id="server">
+          <div class="prose">
+            <h2>For a team, on a server you own</h2>
+            <p>
+              A small or medium team can run one Offee on a Linux server it controls, in the office or at home, and everyone opens it from their own laptop. It is not
+              built to be put on the internet, and running it on a server does not change that:
+            </p>
+            <ul>
+              <li><strong>A private network is the only way in.</strong> Offee on the server answers only the server itself. You reach it through <a href="https://tailscale.com">Tailscale</a>, a private network between your own devices, or through an SSH tunnel if you do not use Tailscale. No port is opened for Offee, and there is no login page, so nobody outside can get to it.</li>
+              <li><strong>There are no user accounts.</strong> Everyone you let onto that private network, or who can log in to the server, sees every profile and document and can turn the switch. It suits a team that already shares its paperwork; give a group that must keep things apart a server of its own.</li>
+              <li><strong>Your documents live on the server</strong>, protected by the server's disk encryption, not your own computer's.</li>
+            </ul>
+            <a class="download quiet" href="https://github.com/cnotv/offee#on-a-server-of-your-own">
+              <svg viewBox="0 0 48 48" aria-hidden="true"><rect x="8" y="7" width="32" height="14" rx="2"/><rect x="8" y="27" width="32" height="14" rx="2"/><path d="M14 14h2M14 34h2M24 14h10M24 34h10"/></svg>
+              <span><strong>The server guide</strong> <span>In the README, with every command</span></span>
+            </a>
+            <details class="extra">
+              <summary>What the server needs, and how to deploy</summary>
+              <div class="extra-body">
+                <p>The server needs Linux with virtualization, Colima and Docker, 16 GB of memory and 25 GB of free disk, and you need SSH access to it. From a copy of the source code on your laptop:</p>
+                <pre><code>./bin/offee remote me@server deploy
+./bin/offee remote me@server tailscale on</code></pre>
+                <p>The first command checks the server and stops before downloading anything if it falls short, then sets Offee up there and makes sure it does not answer on the server's own address. The second makes Offee available over HTTPS to the devices on your Tailscale network, and refuses while Tailscale Funnel, which would publish it to the internet, is on. Without Tailscale, <code>./bin/offee remote me@server tunnel</code> opens it through SSH instead.</p>
+                <p>Tailscale's coordination service learns which of your devices exist and when they connect, but never sees what they send. The <a href="https://github.com/cnotv/offee#on-a-server-of-your-own">README</a> has the details, including how to harden SSH and how to keep even that in house.</p>
+              </div>
+            </details>
+          </div>
         </section>
       </main>
     </div>

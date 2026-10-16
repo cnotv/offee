@@ -18,7 +18,8 @@ jobs:
       - run: pnpm lint --max-warnings 0
       - run: pnpm typecheck
       - run: pnpm test
-      - run: shellcheck bin/offee
+      - run: shellcheck bin/offee bin/offee.test.sh
+      - run: bash bin/offee.test.sh
 
   images:
     # Apple silicon Macs build the images for arm64, so they are built on both architectures.

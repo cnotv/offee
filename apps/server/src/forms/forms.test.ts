@@ -1,10 +1,11 @@
+import { PDFDocument as EncryptingPDFDocument } from '@cantoo/pdf-lib'
 import { PDFDocument } from 'pdf-lib'
 import { describe, expect, it } from 'vitest'
 import type { Profile } from '@offee/contracts'
 import { createSigningCertificate } from './certificate.ts'
 import shippedAliasesFile from '../../../../config/form-field-aliases.json' with { type: 'json' }
 import { fieldAliasesSchema, matchFieldToKey, normalizeFieldName, suggestFromProfile } from './match-fields.ts'
-import { fillForm, readFormFields } from './pdf-form.ts'
+import { decryptPdf, fillForm, readFormFields } from './pdf-form.ts'
 
 const aliases = {
   fullName: ['fullname', 'name'],
@@ -67,6 +68,33 @@ describe('matching fields to a profile', () => {
     const fields = ['Occupation', 'Date of birth', 'Place of birth', 'Geburtsdatum', 'Place and date'].map((name) => ({ name, kind: 'text' as const, options: [] }))
     expect(suggestFromProfile(fields, profile, shippedAliases, '15/10/2026').map((suggestion) => suggestion.value)).toEqual(['Engineer', '', '', '', 'London, 15/10/2026'])
   })
+
+  it('fills the tax return labels that are the profile, and leaves death, birth, the spouse and a foreign address to the model', () => {
+    const shippedAliases = fieldAliasesSchema.parse(shippedAliasesFile)
+    const resident = { ...profile, street: 'Hauptstraße 1', postalCode: '10115', city: 'Berlin', country: 'Deutschland' }
+    const valueFor = (label: string): string => suggestFromProfile([{ name: label, kind: 'text', options: [] }], resident, shippedAliases, '15/10/2026')[0]?.value ?? ''
+    expect(['Name', 'Vorname', 'Ausgeübter Beruf', 'Straße (derzeitige Adresse)', 'Postleitzahl (Inland)', 'Wohnort', 'Ort, Datum'].map(valueFor)).toEqual([
+      'Ada Lovelace',
+      'Ada',
+      'Engineer',
+      'Hauptstraße 1',
+      '10115',
+      'Berlin',
+      'Berlin, 15/10/2026',
+    ])
+    const notTheProfile = [
+      'im Sterbefall: Sterbedatum',
+      'Geburtsdatum',
+      'Adressergänzung',
+      'Postleitzahl (Ausland)',
+      'Staat (falls Anschrift im Ausland)',
+      'Name 2',
+      'Vorname 2',
+      'Abweichende Anschrift der Ehefrau oder Person B',
+      'Person B: Vorname',
+    ]
+    expect(notTheProfile.map(valueFor)).toEqual(notTheProfile.map(() => ''))
+  })
 })
 
 describe('filling and signing a PDF form', () => {
@@ -102,4 +130,30 @@ describe('filling and signing a PDF form', () => {
     expect(signedText).toContain('/ETSI.CAdES.detached')
     expect(signedText).not.toMatch(/\/Contents\s*<0+>/)
   }, 30_000)
+})
+
+const encrypt = async (content: Uint8Array, userPassword: string): Promise<Uint8Array> => {
+  const document = await EncryptingPDFDocument.load(content)
+  document.encrypt({ userPassword, ownerPassword: 'owner', permissions: { modifying: false } })
+  return document.save()
+}
+
+describe('opening an encrypted PDF form', () => {
+  it('decrypts a form anyone may open, so its fields can be read and filled', async () => {
+    const encrypted = await encrypt(await makeForm(), '')
+    const decrypted = await decryptPdf(encrypted)
+    expect((await readFormFields(decrypted)).map((field) => field.name)).toEqual(['Name', 'E-Mail Address', 'Company name', 'Favourite colour', 'Agree'])
+    const filled = await fillForm(decrypted, { values: [{ name: 'Name', value: 'Ada Lovelace', source: 'profile' }], sign: null })
+    expect((await PDFDocument.load(filled)).getForm().getTextField('Name').getText()).toBe('Ada Lovelace')
+  })
+
+  it('says a form needs a password to open, rather than failing inside the PDF library', async () => {
+    const locked = await encrypt(await makeForm(), 'secret')
+    await expect(decryptPdf(locked)).rejects.toThrow('This PDF needs a password to open')
+  })
+
+  it('leaves a PDF that is not encrypted as it is', async () => {
+    const plain = await makeForm()
+    expect(await decryptPdf(plain)).toBe(plain)
+  })
 })

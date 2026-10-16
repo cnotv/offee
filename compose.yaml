@@ -25,7 +25,8 @@ services:
     build: { context: ., dockerfile: deploy/app.Dockerfile }
     image: offee/app:local
     environment:
-      OFFEE_ALLOWED_HOSTS: localhost,127.0.0.1
+      # `offee tailscale on` adds the server's tailnet name.
+      OFFEE_ALLOWED_HOSTS: ${OFFEE_ALLOWED_HOSTS:-localhost,127.0.0.1}
       OFFEE_REMOTE_MODEL: ${OFFEE_REMOTE_MODEL:-claude-opus-5-5}
     volumes: [offee-data:/data]
     networks: [internal]

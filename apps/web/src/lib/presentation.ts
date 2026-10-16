@@ -41,6 +41,15 @@ const workflowNames: Record<RunSummary['workflow'], string> = {
  */
 export const workflowName = (workflow: RunSummary['workflow']): string => workflowNames[workflow]
 
+const byteFormat = new Intl.NumberFormat(undefined, { style: 'unit', unit: 'byte', notation: 'compact', unitDisplay: 'narrow' })
+
+/**
+ * A size in bytes, short, in the person's locale.
+ * @param bytes The size.
+ * @returns For example 12KB.
+ */
+export const formatBytes = (bytes: number): string => byteFormat.format(bytes)
+
 /**
  * A timestamp in the person's locale, short.
  * @param timestamp Milliseconds since the epoch.

@@ -1,5 +1,6 @@
 import {
   ActivityLogIcon,
+  ArchiveIcon,
   ChatBubbleIcon,
   FileTextIcon,
   GlobeIcon,
@@ -32,6 +33,7 @@ const navigationItems: { title: string; path: string; Icon: typeof ChatBubbleIco
   { title: 'Profiles', path: '/profiles', Icon: IdCardIcon },
   { title: 'Personas', path: '/personas', Icon: PersonIcon },
   { title: 'Run log', path: '/runs', Icon: ActivityLogIcon },
+  { title: 'Stored data', path: '/data', Icon: ArchiveIcon },
 ]
 
 const readPageTitle = (handle: unknown): string | null =>

@@ -50,6 +50,12 @@ export const outboundRecordSchema = z.object({
 
 export const workflowKindSchema = z.enum(['chat', 'reply', 'translate', 'review', 'transcribe', 'form', 'profile'])
 
+export const storedItemKindSchema = z.enum(['profile', 'persona', 'document', 'file', 'run'])
+
+export const storedItemDeletionSchema = z.object({
+  items: z.array(z.object({ kind: storedItemKindSchema, id: z.string().min(1).max(100) })).min(1).max(10_000),
+})
+
 export const workflowContextSchema = z.object({
   profileId: z.string().nullable(),
   personaId: z.string().nullable(),
@@ -88,9 +94,18 @@ export const fieldSuggestionSchema = z.object({
   source: z.enum(['profile', 'model', 'none']),
 })
 
+export const placedFieldSchema = z.object({
+  name: z.string().min(1).max(200),
+  line: z.number().int().min(1),
+  kind: z.enum(['text', 'checkbox']),
+  position: z.enum(['below', 'above', 'right', 'left']),
+})
+
 export const formFillRequestSchema = z.object({
   formFileId: z.string().min(1),
   profileId: z.string().min(1),
-  values: z.array(fieldSuggestionSchema).max(2_000),
+  // A complete income tax return has over 2,000 fields.
+  values: z.array(fieldSuggestionSchema).max(10_000),
+  placedFields: z.array(placedFieldSchema).max(10_000),
   sign: z.boolean(),
 })

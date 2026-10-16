@@ -4,3 +4,6 @@ build/
 .env
 /pr-preview/
 *.sqlite
+.data-dev/
+test-results/
+playwright-report/

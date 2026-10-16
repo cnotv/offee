@@ -73,6 +73,9 @@ export const formInspectionSchema = z.object({
   ),
   suggestions: z.array(fieldSuggestionSchema),
   model: modelUsedSchema.nullable(),
+  placedFields: z.array(
+    z.object({ name: z.string(), line: z.number(), kind: z.enum(['text', 'checkbox']), position: z.enum(['below', 'above', 'right', 'left']) }),
+  ),
 })
 
 export const profileReadingSchema = z.object({
@@ -125,6 +128,14 @@ export const runDetailSchema = runSummarySchema.extend({
   input: z.string(),
   output: z.string(),
   outbound: z.array(outboundRecordSchema),
+})
+
+export const storedItemSchema = z.object({
+  kind: z.enum(['profile', 'persona', 'document', 'file', 'run']),
+  id: z.string(),
+  title: z.string(),
+  bytes: z.number(),
+  createdAt: z.number(),
 })
 
 export const extractedTextSchema = z.object({ text: z.string() })

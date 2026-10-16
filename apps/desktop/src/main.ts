@@ -13,7 +13,7 @@ import { describeFailure } from './setup-messages.ts'
 import { trayEntries } from './tray-menu.ts'
 import type { AvailableUpdate, ControlState, InstallKind, PendingRequest, SwitchRequest, TrayAction, TrayEntry, UpdateState, WindowView } from './types.ts'
 import { downloadVerified, fetchRelease, installDebianPackage, replaceMacApp } from './update-install.ts'
-import { assetNameFor, installKindFor, macAppBundle, parseRelease, releasePageFor, releaseTagFor, startCommandFor, updateFor } from './updates.ts'
+import { assetNameFor, installKindFor, macAppBundle, parseRelease, releasePageFor, releaseTagFor, startCommandFor, stopsVmOnQuit, updateFor } from './updates.ts'
 import { layoutViews } from './window-layout.ts'
 import { isAllowedRequestUrl, isOffeeUrl, isPermissionAllowed, offeeOrigin, pathWithHomebrew, unreachableProxy } from './window-policy.ts'
 
@@ -51,6 +51,7 @@ const runtime: {
   errorShown: boolean
   longRunningLauncher: AbortController | null
   availableUpdate: AvailableUpdate | null
+  restartingForUpdate: boolean
 } = {
   state: { phase: 'checking', gateway: null, hasAnthropicKey: false, message: null, view: 'settings', buildCommit, update: { status: 'idle' } },
   tray: null,
@@ -63,6 +64,7 @@ const runtime: {
   errorShown: false,
   longRunningLauncher: null,
   availableUpdate: null,
+  restartingForUpdate: false,
 }
 
 // Everything the launcher prints and every error lands here, so a failure on someone's computer
@@ -458,6 +460,7 @@ const confirmInstall = async (): Promise<boolean> => {
 }
 
 const relaunch = (): void => {
+  runtime.restartingForUpdate = true
   app.relaunch()
   app.quit()
 }
@@ -560,11 +563,10 @@ const createTray = (): void => {
 }
 
 // Quitting stops the VM in the background so the app can close at once. A setup that failed or
-// is still running has a VM too, and possibly a download, so only a VM that was never created or
-// is already stopped is left alone.
+// is still running has a VM too, and possibly a download, so it is stopped as well.
 const stopInBackground = (): void => {
   cancelLongRunningLauncher()
-  if (runtime.state.phase === 'needs-setup' || runtime.state.phase === 'stopped') return
+  if (!stopsVmOnQuit(runtime.state.phase, runtime.restartingForUpdate)) return
   const child = spawn(launcherPath, ['stop'], {
     detached: true,
     stdio: 'ignore',

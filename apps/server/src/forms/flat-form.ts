@@ -1,0 +1,195 @@
+import { PDFDocument } from 'pdf-lib'
+import type { PDFPage } from 'pdf-lib'
+import { extractTextItems } from 'unpdf'
+import { z } from 'zod'
+import type { PlacedField } from '@offee/contracts'
+
+export type TextLine = {
+  id: number
+  page: number
+  x: number
+  y: number
+  width: number
+  size: number
+  text: string
+}
+
+type PositionedText = Omit<TextLine, 'id'>
+
+type Rectangle = { x: number; y: number; width: number; height: number }
+
+// Words of one label sit a space apart, about a third of the font size; a wider gap on the same
+// row starts another column's label.
+const largestGapWithinLabelPerFontSize = 0.6
+const sameRowTolerance = 2
+const pageMargin = 36
+const textFieldHeight = 12
+const checkboxSize = 10
+const smallestTextFieldWidth = 40
+const largestFieldWidthLeftOfLabel = 150
+const positions = ['below', 'above', 'right', 'left'] as const
+
+const readPageTexts = async (content: Uint8Array): Promise<PositionedText[]> =>
+  (await extractTextItems(new Uint8Array(content))).items.flatMap((pageItems, index) =>
+    pageItems.flatMap((item) =>
+      item.str.trim() === '' ? [] : [{ page: index + 1, x: item.x, y: item.y, width: item.width, size: item.fontSize, text: item.str.trim() }],
+    ),
+  )
+
+const sameRow = (left: { page: number; y: number }, right: { page: number; y: number }): boolean =>
+  left.page === right.page && Math.abs(left.y - right.y) <= sameRowTolerance
+
+const mergeIntoLines = (texts: PositionedText[]): PositionedText[] =>
+  texts
+    .toSorted((left, right) => left.page - right.page || (sameRow(left, right) ? left.x - right.x : right.y - left.y))
+    .reduce<PositionedText[]>((lines, text) => {
+      const last = lines.at(-1)
+      if (last === undefined || !sameRow(last, text) || text.x - (last.x + last.width) > largestGapWithinLabelPerFontSize * Math.max(last.size, text.size)) {
+        return [...lines, text]
+      }
+      const merged = { ...last, width: text.x + text.width - last.x, size: Math.max(last.size, text.size), text: `${last.text} ${text.text}` }
+      return [...lines.slice(0, -1), merged]
+    }, [])
+
+/**
+ * Reads a PDF's text as labelled lines with their positions, so a form drawn without fields
+ * can still say where its labels are. Text close together on one row is one label; text
+ * further apart is a label of another column.
+ * @param content The PDF.
+ * @returns The lines, page by page from top to bottom and left to right, numbered from 1.
+ */
+export const readTextLines = async (content: Uint8Array): Promise<TextLine[]> =>
+  mergeIntoLines(await readPageTexts(content)).map((line, index) => ({ id: index + 1, ...line }))
+
+const placementPattern = `^[0-9]+ (text|checkbox) (${positions.join('|')})$`
+
+/**
+ * The JSON schema the model answers in when it places fields on a form that has none: one short
+ * string per field, such as "35 text below", rather than an object with a name, so a page of
+ * fields costs a few hundred tokens instead of thousands. The name comes from the label.
+ */
+export const fieldPlacementSchema: Record<string, unknown> = {
+  type: 'object',
+  properties: { fields: { type: 'array', items: { type: 'string', pattern: placementPattern } } },
+  required: ['fields'],
+}
+
+const placementSchema = z.object({
+  line: z.coerce.number().int().positive(),
+  kind: z.enum(['text', 'checkbox']),
+  position: z.enum(positions),
+})
+
+// A dot separates the parts of a field's full name in a PDF, so a label like "Lfd. Nr." loses it;
+// a long label, a whole sentence on some forms, is cut to a name that fits the review table.
+const longestFieldName = 60
+const fieldNameOf = (name: string): string =>
+  name
+    .replace(/[.…]/g, '')
+    .replace(/\s+/g, ' ')
+    .replace(/:\s*$/, '')
+    .trim()
+    .slice(0, longestFieldName)
+    .trim()
+
+/**
+ * Keeps the fields that sit on an existing line and gives each a name of its own: a name
+ * already taken gets a number, so "Vorname" twice becomes "Vorname" and "Vorname 2".
+ * @param fields The fields, from the model or from the person's corrections.
+ * @param lines The form's text lines.
+ * @returns The usable fields, in the same order.
+ */
+export const usablePlacedFields = (fields: PlacedField[], lines: TextLine[]): PlacedField[] => {
+  const linesById = new Map(lines.map((line) => [line.id, line]))
+  return fields.reduce<PlacedField[]>((usable, field) => {
+    const line = linesById.get(field.line)
+    const baseName = fieldNameOf(field.name) || fieldNameOf(line?.text ?? '')
+    if (line === undefined || baseName === '') return usable
+    const taken = new Set(usable.map((placed) => placed.name))
+    const name =
+      Array.from({ length: usable.length + 1 }, (_, index) => (index === 0 ? baseName : `${baseName} ${index + 1}`)).find((candidate) => !taken.has(candidate)) ??
+      baseName
+    return [...usable, { ...field, name }]
+  }, [])
+}
+
+// A small model put nearly every text field to the right of its label, where a form's boxes put
+// the answer below. The label says it better: one ending in a colon or dots is followed by its
+// answer on the same line, any other has it below or, as the model may say, above.
+const answerFollowsOnTheLine = /(:|\.{2,}|…)$/
+
+const textPositionFor = (kind: PlacedField['kind'], position: PlacedField['position'], label: string): PlacedField['position'] => {
+  if (kind === 'checkbox') return position
+  if (answerFollowsOnTheLine.test(label.trim())) return 'right'
+  return position === 'above' ? 'above' : 'below'
+}
+
+/**
+ * Turns the model's answer into placed fields, each named after its label. Every complete
+ * "line kind position" string counts, so an answer cut off at its token limit still gives the
+ * fields it got to, and an answer wrapped in prose by a remote model reads the same.
+ * @param modelAnswer The model's raw answer.
+ * @param lines The form's text lines.
+ * @returns The placed fields, in the model's order; empty when the answer has none.
+ */
+export const fieldPlacementsFromModelAnswer = (modelAnswer: string, lines: TextLine[]): PlacedField[] => {
+  const linesById = new Map(lines.map((line) => [line.id, line]))
+  return usablePlacedFields(
+    [...modelAnswer.matchAll(/"(\d+) (text|checkbox) (below|above|right|left)"/g)].flatMap(([, line, kind, position]) => {
+      const parsed = placementSchema.safeParse({ line, kind, position })
+      if (!parsed.success) return []
+      const label = linesById.get(parsed.data.line)?.text ?? ''
+      return [{ ...parsed.data, position: textPositionFor(parsed.data.kind, parsed.data.position, label), name: '' }]
+    }),
+    lines,
+  )
+}
+
+const rightEdgeFor = (line: TextLine, from: number, lines: TextLine[], page: PDFPage): number => {
+  const nextLabel = lines.filter((other) => sameRow(other, line) && other.x > from).toSorted((left, right) => left.x - right.x)[0]
+  return nextLabel === undefined ? page.getWidth() - pageMargin : nextLabel.x - 6
+}
+
+const rectangleFor = (field: PlacedField, line: TextLine, lines: TextLine[], page: PDFPage): Rectangle => {
+  const height = field.kind === 'checkbox' ? checkboxSize : textFieldHeight
+  const widthFrom = (x: number): number => (field.kind === 'checkbox' ? checkboxSize : Math.max(rightEdgeFor(line, x, lines, page) - x, smallestTextFieldWidth))
+  const onTheLine = line.y - (height - line.size) / 2
+  if (field.position === 'left') {
+    const width = field.kind === 'checkbox' ? checkboxSize : Math.max(Math.min(largestFieldWidthLeftOfLabel, line.x - pageMargin - 4), smallestTextFieldWidth)
+    return { x: Math.max(line.x - width - 4, 0), y: onTheLine, width, height }
+  }
+  if (field.position === 'right') {
+    const x = line.x + line.width + 4
+    return { x, y: onTheLine, width: widthFrom(x), height }
+  }
+  return { x: line.x, y: field.position === 'above' ? line.y + line.size + 1 : line.y - 2 - height, width: widthFrom(line.x), height }
+}
+
+/**
+ * Adds a real form field for every placed field, without border or background so the form's
+ * own drawing still shows.
+ * @param content The PDF without fields.
+ * @param fields The placed fields.
+ * @param lines The form's text lines, to find each label and stop a field before the next one.
+ * @returns The PDF with the fields added.
+ */
+export const addPlacedFields = async (content: Uint8Array, fields: PlacedField[], lines: TextLine[]): Promise<Uint8Array> => {
+  const document = await PDFDocument.load(content, { ignoreEncryption: true })
+  const form = document.getForm()
+  const pages = document.getPages()
+  const linesById = new Map(lines.map((line) => [line.id, line]))
+  usablePlacedFields(fields, lines).forEach((field) => {
+    const line = linesById.get(field.line)
+    const page = line === undefined ? undefined : pages[line.page - 1]
+    if (line === undefined || page === undefined) return
+    const appearance = { ...rectangleFor(field, line, lines, page), borderWidth: 0, backgroundColor: undefined }
+    if (field.kind === 'checkbox') {
+      form.createCheckBox(field.name).addToPage(page, appearance)
+      return
+    }
+    const textField = form.createTextField(field.name)
+    textField.addToPage(page, appearance)
+    textField.setFontSize(9)
+  })
+  return document.save()
+}

@@ -88,6 +88,13 @@ export const condenseTask =
 export const formTask =
   'Fill in form fields for the person. For each field, give the value from the facts you have or from the passages of their documents, or an empty string when neither says. Never invent personal data. Answer with JSON only.'
 
+export const fieldPlacementTask =
+  'This PDF form has no fillable fields. Its text is listed one line per row as "line number (page): text". ' +
+  'Pick the lines that are labels of something a person writes in or ticks, and give each as one string "line kind position": ' +
+  'kind is "checkbox" for a choice to tick, otherwise "text"; position is "left" for a checkbox whose box is before its label, ' +
+  'for text "above" when the label is printed under its blank line, otherwise "below". ' +
+  'For example {"fields": ["12 text below", "15 checkbox left"]}. Leave out headings, instructions, notes and page numbers. Answer with JSON only.'
+
 export const profileDetailsTask =
   'Pick out the details about the person this document describes. Copy each value exactly as the document writes it, and leave a field empty when the document does not give it. ' +
   '"role" is their job title or occupation and "organization" their employer or company. ' +

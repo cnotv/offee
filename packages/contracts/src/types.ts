@@ -140,6 +140,16 @@ export type FormField = {
   options: string[]
 }
 
+export type PlacedFieldPosition = 'below' | 'above' | 'right' | 'left'
+
+// A field Offee added to a PDF that had none, on the text line that labels it.
+export type PlacedField = {
+  name: string
+  line: number
+  kind: 'text' | 'checkbox'
+  position: PlacedFieldPosition
+}
+
 export type FieldSuggestionSource = 'profile' | 'model' | 'none'
 
 export type FieldSuggestion = {
@@ -154,12 +164,15 @@ export type FormInspection = {
   fields: FormField[]
   suggestions: FieldSuggestion[]
   model: ModelUsed | null
+  // Empty when the PDF brought its own fields; otherwise the fields the model placed, to check.
+  placedFields: PlacedField[]
 }
 
 export type FormFillRequest = {
   formFileId: string
   profileId: string
   values: FieldSuggestion[]
+  placedFields: PlacedField[]
   sign: boolean
 }
 
@@ -223,3 +236,18 @@ export type PendingRequest = {
   bodyBytes: number
   bodyPreview: string
 }
+
+export type StoredItemKind = 'profile' | 'persona' | 'document' | 'file' | 'run'
+
+/** One thing Offee keeps in its database, for the Stored data page. */
+export type StoredItem = {
+  kind: StoredItemKind
+  id: string
+  title: string
+  /** Approximate: the stored text and file content, not the database's own overhead. */
+  bytes: number
+  createdAt: number
+}
+
+/** Which stored items to delete at once. */
+export type StoredItemKey = Pick<StoredItem, 'kind' | 'id'>

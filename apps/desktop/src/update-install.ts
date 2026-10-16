@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { rename, rm, writeFile } from 'node:fs/promises'
+import { rename, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { promisify } from 'node:util'
 import { digestMatches } from './updates.ts'
@@ -43,6 +43,15 @@ export const downloadVerified = async (asset: ReleaseAsset, directory: string): 
 }
 
 /**
+ * Deletes an app bundle, if there is one. Electron's fs reads an .asar archive as a folder, so
+ * fs.rm never unlinks app.asar and then fails to remove Resources; rm sees the real file.
+ * @param bundle The bundle's path.
+ */
+export const removeBundle = async (bundle: string): Promise<void> => {
+  await runProgram('rm', ['-rf', bundle])
+}
+
+/**
  * Puts the app from a disk image in place of the running one. The new bundle is copied next to
  * the old one first, so swapping them is two renames in one folder, undone if the second fails.
  * @param diskImage The verified disk image.
@@ -53,7 +62,7 @@ export const replaceMacApp = async (diskImage: string, workDirectory: string, ap
   const mountPoint = join(workDirectory, 'mount')
   const staged = join(dirname(appBundle), '.Offee-update.app')
   const previous = join(dirname(appBundle), '.Offee-previous.app')
-  await rm(staged, { recursive: true, force: true })
+  await removeBundle(staged)
   await runProgram('hdiutil', ['attach', '-nobrowse', '-readonly', '-mountpoint', mountPoint, diskImage])
   try {
     await runProgram('ditto', [join(mountPoint, 'Offee.app'), staged])
@@ -61,7 +70,7 @@ export const replaceMacApp = async (diskImage: string, workDirectory: string, ap
     await runProgram('hdiutil', ['detach', mountPoint, '-force'])
   }
   await runProgram('codesign', ['--verify', '--deep', '--strict', staged])
-  await rm(previous, { recursive: true, force: true })
+  await removeBundle(previous)
   await rename(appBundle, previous)
   try {
     await rename(staged, appBundle)
@@ -69,7 +78,7 @@ export const replaceMacApp = async (diskImage: string, workDirectory: string, ap
     await rename(previous, appBundle)
     throw error
   }
-  await rm(previous, { recursive: true, force: true })
+  await removeBundle(previous)
 }
 
 /**
