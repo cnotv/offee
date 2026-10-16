@@ -92,7 +92,7 @@ export const fieldPlacementTask =
   'This PDF form has no fillable fields. Its text is listed one line per row as "line number (page): text". ' +
   'Pick the lines that are labels of something a person writes in or ticks, and give each as one string "line kind position": ' +
   'kind is "checkbox" for a choice to tick, otherwise "text"; position is "left" for a checkbox whose box is before its label, ' +
-  'for text "right" when the answer goes on the same line after the label (a label ending in a colon or followed by dots), "above" when the label is printed under its blank line, otherwise "below". ' +
+  'for text "above" when the label is printed under its blank line, otherwise "below". ' +
   'For example {"fields": ["12 text below", "15 checkbox left"]}. Leave out headings, instructions, notes and page numbers. Answer with JSON only.'
 
 export const profileDetailsTask =

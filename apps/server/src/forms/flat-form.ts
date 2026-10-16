@@ -83,7 +83,14 @@ const placementSchema = z.object({
 // A dot separates the parts of a field's full name in a PDF, so a label like "Lfd. Nr." loses it;
 // a long label, a whole sentence on some forms, is cut to a name that fits the review table.
 const longestFieldName = 60
-const fieldNameOf = (name: string): string => name.replace(/\./g, '').replace(/\s+/g, ' ').trim().slice(0, longestFieldName).trim()
+const fieldNameOf = (name: string): string =>
+  name
+    .replace(/[.…]/g, '')
+    .replace(/\s+/g, ' ')
+    .replace(/:\s*$/, '')
+    .trim()
+    .slice(0, longestFieldName)
+    .trim()
 
 /**
  * Keeps the fields that sit on an existing line and gives each a name of its own: a name
@@ -106,6 +113,17 @@ export const usablePlacedFields = (fields: PlacedField[], lines: TextLine[]): Pl
   }, [])
 }
 
+// A small model put nearly every text field to the right of its label, where a form's boxes put
+// the answer below. The label says it better: one ending in a colon or dots is followed by its
+// answer on the same line, any other has it below or, as the model may say, above.
+const answerFollowsOnTheLine = /(:|\.{2,}|…)$/
+
+const textPositionFor = (kind: PlacedField['kind'], position: PlacedField['position'], label: string): PlacedField['position'] => {
+  if (kind === 'checkbox') return position
+  if (answerFollowsOnTheLine.test(label.trim())) return 'right'
+  return position === 'above' ? 'above' : 'below'
+}
+
 /**
  * Turns the model's answer into placed fields, each named after its label. Every complete
  * "line kind position" string counts, so an answer cut off at its token limit still gives the
@@ -114,14 +132,18 @@ export const usablePlacedFields = (fields: PlacedField[], lines: TextLine[]): Pl
  * @param lines The form's text lines.
  * @returns The placed fields, in the model's order; empty when the answer has none.
  */
-export const fieldPlacementsFromModelAnswer = (modelAnswer: string, lines: TextLine[]): PlacedField[] =>
-  usablePlacedFields(
+export const fieldPlacementsFromModelAnswer = (modelAnswer: string, lines: TextLine[]): PlacedField[] => {
+  const linesById = new Map(lines.map((line) => [line.id, line]))
+  return usablePlacedFields(
     [...modelAnswer.matchAll(/"(\d+) (text|checkbox) (below|above|right|left)"/g)].flatMap(([, line, kind, position]) => {
       const parsed = placementSchema.safeParse({ line, kind, position })
-      return parsed.success ? [{ ...parsed.data, name: '' }] : []
+      if (!parsed.success) return []
+      const label = linesById.get(parsed.data.line)?.text ?? ''
+      return [{ ...parsed.data, position: textPositionFor(parsed.data.kind, parsed.data.position, label), name: '' }]
     }),
     lines,
   )
+}
 
 const rightEdgeFor = (line: TextLine, from: number, lines: TextLine[], page: PDFPage): number => {
   const nextLabel = lines.filter((other) => sameRow(other, line) && other.x > from).toSorted((left, right) => left.x - right.x)[0]

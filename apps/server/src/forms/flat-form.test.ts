@@ -31,10 +31,12 @@ describe('filling a form that has no fields', () => {
 
   it('names each field after its label, keeps only real lines, and reads an answer cut off at its limit', async () => {
     const lines = await readTextLines(await makeFlatForm())
-    const cutOff = 'Here you go: {"fields": ["1 text below", "1 text below", "99 text below", "3 text sideways", "4 checkbox left", "2 text be'
+    const cutOff = 'Here you go: {"fields": ["1 text right", "1 text below", "99 text below", "3 text sideways", "3 text below", "4 checkbox left", "2 text be'
     expect(fieldPlacementsFromModelAnswer(cutOff, lines)).toEqual([
       { line: 1, name: 'Familienname', kind: 'text', position: 'below' },
       { line: 1, name: 'Familienname 2', kind: 'text', position: 'below' },
+      // "Geburtsdatum:" ends in a colon, so its answer follows on the line whatever the model said.
+      { line: 3, name: 'Geburtsdatum', kind: 'text', position: 'right' },
       { line: 4, name: 'leibliches Kind', kind: 'checkbox', position: 'left' },
     ])
     expect(fieldPlacementsFromModelAnswer('no fields here', lines)).toEqual([])
