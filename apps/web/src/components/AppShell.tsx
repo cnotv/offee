@@ -95,7 +95,7 @@ export const AppShell = () => {
       <nav className="app-sidebar" aria-label="Main">
         {!inDesktopApp && (
           <Flex align="center" gap="2" className="app-sidebar-title">
-            <img src="/favicon.svg" width={24} height={24} alt="" />
+            <img src={`${import.meta.env.BASE_URL}favicon.svg`} width={24} height={24} alt="" />
             <Text size="3" weight="bold">
               Offee
             </Text>
