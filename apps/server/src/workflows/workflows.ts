@@ -20,7 +20,7 @@ import type { FieldAliases } from '../forms/match-fields.ts'
 import { suggestFromProfile } from '../forms/match-fields.ts'
 import type { TextLine } from '../forms/flat-form.ts'
 import { addPlacedFields, fieldPlacementSchema, fieldPlacementsFromModelAnswer, readTextLines, usablePlacedFields } from '../forms/flat-form.ts'
-import { fillForm, readFormFields } from '../forms/pdf-form.ts'
+import { decryptPdf, fillForm, readFormFields } from '../forms/pdf-form.ts'
 import { chunkText } from '../knowledge/chunk-text.ts'
 import type { Generation, Models } from '../llm/generate.ts'
 import { generate } from '../llm/generate.ts'
@@ -230,8 +230,10 @@ export const createWorkflows = (dependencies: WorkflowDependencies) => {
       return { runId, text }
     },
 
-    inspectForm: async (upload: { name: string; content: Uint8Array }, context: WorkflowContext, signal: AbortSignal): Promise<FormInspection> => {
+    inspectForm: async (encryptedUpload: { name: string; content: Uint8Array }, context: WorkflowContext, signal: AbortSignal): Promise<FormInspection> => {
       const { profile, persona } = resolve(context)
+      // Kept decrypted, so saving the filled form reads the same fields.
+      const upload = { ...encryptedUpload, content: await decryptPdf(encryptedUpload.content) }
       const placedFields = await placeFields(upload, persona, signal)
       const fields = await readFormFields(await withPlacedFields(upload.content, placedFields))
       const formFileId = dependencies.files.put({ name: upload.name, mimeType: 'application/pdf', content: upload.content })

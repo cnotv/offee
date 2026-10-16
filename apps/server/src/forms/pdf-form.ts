@@ -1,3 +1,4 @@
+import { PDFDocument as DecryptingPDFDocument } from '@cantoo/pdf-lib'
 import { PDFCheckBox, PDFDocument, PDFDropdown, PDFOptionList, PDFRadioGroup, PDFSignature, PDFTextField } from 'pdf-lib'
 import type { PDFField } from 'pdf-lib'
 import { pdflibAddPlaceholder } from '@signpdf/placeholder-pdf-lib'
@@ -32,6 +33,23 @@ export const readFormFields = async (content: Uint8Array): Promise<FormField[]> 
     .getForm()
     .getFields()
     .map((field) => ({ name: field.getName(), kind: kindOf(field), options: optionsOf(field) }))
+}
+
+/**
+ * Removes the encryption many official forms carry to restrict editing. pdf-lib cannot decrypt,
+ * and reading such a form's encrypted object streams as they are finds no fields at all.
+ * @param content The PDF as uploaded.
+ * @returns The PDF without encryption; the same bytes when it was not encrypted.
+ */
+export const decryptPdf = async (content: Uint8Array): Promise<Uint8Array> => {
+  if (!(await DecryptingPDFDocument.load(content, { ignoreEncryption: true })).isEncrypted) return content
+  const document = await DecryptingPDFDocument.load(content, { password: '' }).catch((error: unknown) => {
+    if (error instanceof Error && error.message === 'NEEDS PASSWORD') {
+      throw new Error('This PDF needs a password to open. Open it, save a copy without the password, and try again.')
+    }
+    throw error
+  })
+  return document.save()
 }
 
 const truthyAnswers = new Set(['x', 'yes', 'true', '1', 'on', 'ja', 'si', 'sì', 'oui', 'sí', 'checked'])
