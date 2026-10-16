@@ -222,17 +222,11 @@ figure.window figcaption {
   color: var(--muted);
 }
 
-/* Feature tour: one clip on stage, the features as tabs beside it, the active one filling as its clip plays. */
+/* Feature tour: one clip on stage, the features as tabs under it, the active one filling as its clip plays. */
 .tour {
   display: grid;
   gap: 1.25rem;
   align-items: start;
-}
-
-@media (min-width: 60rem) {
-  .tour {
-    grid-template-columns: 7fr 3fr;
-  }
 }
 
 .tour-stage {

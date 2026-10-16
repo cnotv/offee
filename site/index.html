@@ -86,16 +86,101 @@
               <span><strong>For a team: run it on a server you own</strong> <span>Reached through Tailscale or an SSH tunnel</span></span>
             </a>
           </div>
-          <figure class="window">
-            <video id="demo" muted loop playsinline controls preload="metadata" width="1280" height="800" poster="media/offee-fill-a-form.png" aria-label="Offee reads a scanned personal data sheet into a profile, then fills a tenant form from that profile.">
-              <source src="media/offee-fill-a-form.mp4" type="video/mp4">
-            </video>
+          <div>
+            <div class="tour">
+              <div class="tour-stage" role="tabpanel" id="tour-panel" aria-labelledby="tour-profile">
+                <video muted playsinline controls preload="metadata" width="1280" height="800" src="media/clips/profile.mp4" poster="media/clips/profile.webp" aria-label="A scanned personal data sheet is read into a new profile."></video>
+                <button type="button" class="tour-pause" aria-label="Pause the clips" aria-pressed="false" hidden>
+                  <svg class="icon-pause" viewBox="0 0 16 16" aria-hidden="true"><rect x="3" y="2" width="3.5" height="12" rx="1"/><rect x="9.5" y="2" width="3.5" height="12" rx="1"/></svg>
+                  <svg class="icon-play" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2.5v11a1 1 0 0 0 1.5.86l9-5.5a1 1 0 0 0 0-1.72l-9-5.5A1 1 0 0 0 4 2.5z"/></svg>
+                </button>
+              </div>
+              <div class="tour-tabs" role="tablist" aria-label="What Offee does" aria-orientation="vertical">
+                <button type="button" role="tab" id="tour-profile" aria-controls="tour-panel" aria-selected="true" tabindex="0" data-clip="profile" data-alt="A scanned personal data sheet is read into a new profile.">
+                  <strong>Read a document into a profile</strong>
+                  <span>An ID, a CV or a scan: your details land in a profile for you to check.</span>
+                  <span class="tour-progress" aria-hidden="true"></span>
+                </button>
+                <button type="button" role="tab" id="tour-form" aria-controls="tour-panel" aria-selected="false" tabindex="-1" data-clip="form" data-alt="A tenant form is filled from the profile and saved as a PDF.">
+                  <strong>Fill and sign forms</strong>
+                  <span>Pick who you are; Offee fills the PDF, you check each value, it saves and signs.</span>
+                  <span class="tour-progress" aria-hidden="true"></span>
+                </button>
+                <button type="button" role="tab" id="tour-reply" aria-controls="tour-panel" aria-selected="false" tabindex="-1" data-clip="reply" data-alt="A reply to a meeting invitation is drafted from one line of instructions.">
+                  <strong>Reply to emails and chats</strong>
+                  <span>A draft in your name and tone, based on your own documents.</span>
+                  <span class="tour-progress" aria-hidden="true"></span>
+                </button>
+                <button type="button" role="tab" id="tour-translate" aria-controls="tour-panel" aria-selected="false" tabindex="-1" data-clip="translate" data-alt="A short English letter is translated into German.">
+                  <strong>Translate</strong>
+                  <span>A whole document, keeping the names, numbers and terms you care about.</span>
+                  <span class="tour-progress" aria-hidden="true"></span>
+                </button>
+                <button type="button" role="tab" id="tour-review" aria-controls="tour-panel" aria-selected="false" tabindex="-1" data-clip="review" data-alt="Meeting notes become a summary with decisions and action items.">
+                  <strong>Sum up a meeting</strong>
+                  <span>From notes or a recording: a summary, the decisions, who does what.</span>
+                  <span class="tour-progress" aria-hidden="true"></span>
+                </button>
+                <button type="button" role="tab" id="tour-run-log" aria-controls="tour-panel" aria-selected="false" tabindex="-1" data-clip="run-log" data-alt="A run in the log shows its input, its output and that nothing left the machine.">
+                  <strong>See what it did</strong>
+                  <span>Every task is logged: what went in, which AI answered, whether anything left.</span>
+                  <span class="tour-progress" aria-hidden="true"></span>
+                </button>
+              </div>
+            </div>
             <script>
-              // Plays on its own unless the visitor asked for less motion; the controls pause it.
-              if (!matchMedia('(prefers-reduced-motion: reduce)').matches) document.getElementById('demo').play().catch(() => {})
+              // One clip at a time: each plays while the section is on screen and hands over to the next when it ends.
+              // A visitor who asked for less motion starts paused; the button pauses or resumes for anyone.
+              {
+                const tour = document.querySelector('.tour')
+                const stage = tour.querySelector('.tour-stage')
+                const video = stage.querySelector('video')
+                const pause = stage.querySelector('.tour-pause')
+                const tabs = [...tour.querySelectorAll('[role=tab]')]
+                let onScreen = false
+                const paused = () => pause.getAttribute('aria-pressed') === 'true'
+                const run = () => (onScreen && !paused() ? video.play().catch(() => {}) : video.pause())
+                const select = (tab) => {
+                  tabs.forEach((other) => {
+                    other.setAttribute('aria-selected', String(other === tab))
+                    other.tabIndex = other === tab ? 0 : -1
+                    other.style.setProperty('--progress', '0')
+                  })
+                  stage.setAttribute('aria-labelledby', tab.id)
+                  video.poster = `media/clips/${tab.dataset.clip}.webp`
+                  video.src = `media/clips/${tab.dataset.clip}.mp4`
+                  video.setAttribute('aria-label', tab.dataset.alt)
+                  run()
+                }
+                const current = () => tabs.findIndex((tab) => tab.getAttribute('aria-selected') === 'true')
+                const step = (by) => tabs[(current() + by + tabs.length) % tabs.length]
+                video.controls = false
+                pause.hidden = false
+                pause.setAttribute('aria-pressed', String(matchMedia('(prefers-reduced-motion: reduce)').matches))
+                tabs.forEach((tab) => tab.addEventListener('click', () => select(tab)))
+                tour.querySelector('[role=tablist]').addEventListener('keydown', (event) => {
+                  const by = { ArrowDown: 1, ArrowRight: 1, ArrowUp: -1, ArrowLeft: -1 }[event.key]
+                  if (!by) return
+                  event.preventDefault()
+                  const next = step(by)
+                  select(next)
+                  next.focus()
+                })
+                pause.addEventListener('click', () => {
+                  pause.setAttribute('aria-pressed', String(!paused()))
+                  pause.setAttribute('aria-label', paused() ? 'Play the clips' : 'Pause the clips')
+                  run()
+                })
+                video.addEventListener('timeupdate', () => tabs[current()].style.setProperty('--progress', String(video.currentTime / video.duration || 0)))
+                video.addEventListener('ended', () => select(step(1)))
+                new IntersectionObserver(([entry]) => {
+                  onScreen = entry.isIntersecting
+                  run()
+                }, { threshold: 0.5 }).observe(stage)
+              }
             </script>
-            <figcaption>A scan is read into a profile, then a tenant form is filled from it. Recorded on a Mac with the real app and its local model; the two waits for the model, about 5 and 1½ minutes, are cut and marked. The person is made up.</figcaption>
-          </figure>
+            <p class="small">The first two clips use the real local model with its waits cut; the others use a stand-in model, so their answers are canned. All are sped up.</p>
+          </div>
         </div>
 
         <section id="how">
@@ -185,103 +270,6 @@
             The honest trade: an AI small enough for a laptop is slower than the big online ones and can be wrong. That is why Offee always shows its suggestions for
             you to check first.
           </p>
-        </section>
-
-        <section id="does">
-          <h2>What it does today</h2>
-          <div class="tour">
-            <div class="tour-stage" role="tabpanel" id="tour-panel" aria-labelledby="tour-profile">
-              <video muted playsinline controls preload="metadata" width="1280" height="800" src="media/clips/profile.mp4" poster="media/clips/profile.webp" aria-label="A scanned personal data sheet is read into a new profile."></video>
-              <button type="button" class="tour-pause" aria-label="Pause the clips" aria-pressed="false" hidden>
-                <svg class="icon-pause" viewBox="0 0 16 16" aria-hidden="true"><rect x="3" y="2" width="3.5" height="12" rx="1"/><rect x="9.5" y="2" width="3.5" height="12" rx="1"/></svg>
-                <svg class="icon-play" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2.5v11a1 1 0 0 0 1.5.86l9-5.5a1 1 0 0 0 0-1.72l-9-5.5A1 1 0 0 0 4 2.5z"/></svg>
-              </button>
-            </div>
-            <div class="tour-tabs" role="tablist" aria-label="Features" aria-orientation="vertical">
-              <button type="button" role="tab" id="tour-profile" aria-controls="tour-panel" aria-selected="true" tabindex="0" data-clip="profile" data-alt="A scanned personal data sheet is read into a new profile.">
-                <strong>Read a document into a profile</strong>
-                <span>An ID, a CV or a scan: your details land in a profile for you to check.</span>
-                <span class="tour-progress" aria-hidden="true"></span>
-              </button>
-              <button type="button" role="tab" id="tour-form" aria-controls="tour-panel" aria-selected="false" tabindex="-1" data-clip="form" data-alt="A tenant form is filled from the profile and saved as a PDF.">
-                <strong>Fill and sign forms</strong>
-                <span>Pick who you are; Offee fills the PDF, you check each value, it saves and signs.</span>
-                <span class="tour-progress" aria-hidden="true"></span>
-              </button>
-              <button type="button" role="tab" id="tour-reply" aria-controls="tour-panel" aria-selected="false" tabindex="-1" data-clip="reply" data-alt="A reply to a meeting invitation is drafted from one line of instructions.">
-                <strong>Reply to emails and chats</strong>
-                <span>A draft in your name and tone, based on your own documents.</span>
-                <span class="tour-progress" aria-hidden="true"></span>
-              </button>
-              <button type="button" role="tab" id="tour-translate" aria-controls="tour-panel" aria-selected="false" tabindex="-1" data-clip="translate" data-alt="A short English letter is translated into German.">
-                <strong>Translate</strong>
-                <span>A whole document, keeping the names, numbers and terms you care about.</span>
-                <span class="tour-progress" aria-hidden="true"></span>
-              </button>
-              <button type="button" role="tab" id="tour-review" aria-controls="tour-panel" aria-selected="false" tabindex="-1" data-clip="review" data-alt="Meeting notes become a summary with decisions and action items.">
-                <strong>Sum up a meeting</strong>
-                <span>From notes or a recording: a summary, the decisions, who does what.</span>
-                <span class="tour-progress" aria-hidden="true"></span>
-              </button>
-              <button type="button" role="tab" id="tour-run-log" aria-controls="tour-panel" aria-selected="false" tabindex="-1" data-clip="run-log" data-alt="A run in the log shows its input, its output and that nothing left the machine.">
-                <strong>See what it did</strong>
-                <span>Every task is logged: what went in, which AI answered, whether anything left.</span>
-                <span class="tour-progress" aria-hidden="true"></span>
-              </button>
-            </div>
-          </div>
-          <script>
-            // One clip at a time: each plays while the section is on screen and hands over to the next when it ends.
-            // A visitor who asked for less motion starts paused; the button pauses or resumes for anyone.
-            {
-              const tour = document.querySelector('.tour')
-              const stage = tour.querySelector('.tour-stage')
-              const video = stage.querySelector('video')
-              const pause = stage.querySelector('.tour-pause')
-              const tabs = [...tour.querySelectorAll('[role=tab]')]
-              let onScreen = false
-              const paused = () => pause.getAttribute('aria-pressed') === 'true'
-              const run = () => (onScreen && !paused() ? video.play().catch(() => {}) : video.pause())
-              const select = (tab) => {
-                tabs.forEach((other) => {
-                  other.setAttribute('aria-selected', String(other === tab))
-                  other.tabIndex = other === tab ? 0 : -1
-                  other.style.setProperty('--progress', '0')
-                })
-                stage.setAttribute('aria-labelledby', tab.id)
-                video.poster = `media/clips/${tab.dataset.clip}.webp`
-                video.src = `media/clips/${tab.dataset.clip}.mp4`
-                video.setAttribute('aria-label', tab.dataset.alt)
-                run()
-              }
-              const current = () => tabs.findIndex((tab) => tab.getAttribute('aria-selected') === 'true')
-              const step = (by) => tabs[(current() + by + tabs.length) % tabs.length]
-              video.controls = false
-              pause.hidden = false
-              pause.setAttribute('aria-pressed', String(matchMedia('(prefers-reduced-motion: reduce)').matches))
-              tabs.forEach((tab) => tab.addEventListener('click', () => select(tab)))
-              tour.querySelector('[role=tablist]').addEventListener('keydown', (event) => {
-                const by = { ArrowDown: 1, ArrowRight: 1, ArrowUp: -1, ArrowLeft: -1 }[event.key]
-                if (!by) return
-                event.preventDefault()
-                const next = step(by)
-                select(next)
-                next.focus()
-              })
-              pause.addEventListener('click', () => {
-                pause.setAttribute('aria-pressed', String(!paused()))
-                pause.setAttribute('aria-label', paused() ? 'Play the clips' : 'Pause the clips')
-                run()
-              })
-              video.addEventListener('timeupdate', () => tabs[current()].style.setProperty('--progress', String(video.currentTime / video.duration || 0)))
-              video.addEventListener('ended', () => select(step(1)))
-              new IntersectionObserver(([entry]) => {
-                onScreen = entry.isIntersecting
-                run()
-              }, { threshold: 0.5 }).observe(stage)
-            }
-          </script>
-          <p class="small">The first two clips use the real local model with its waits cut; the others use a stand-in model, so their answers are canned. All are sped up.</p>
         </section>
 
         <section id="get">
