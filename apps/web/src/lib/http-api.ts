@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import type { WorkflowContext } from '@offee/contracts'
+import { profileSchema } from '@offee/field-matching'
 import {
   appStatusSchema,
   documentDetailSchema,
@@ -10,7 +11,6 @@ import {
   formInspectionSchema,
   personaSchema,
   profileReadingSchema,
-  profileSchema,
   reviewTemplateSchema,
   runDetailSchema,
   runSummarySchema,
