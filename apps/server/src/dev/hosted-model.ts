@@ -8,7 +8,7 @@ export type HostedModelOptions = {
   model: string
   fetchFunction?: typeof fetch
   rateLimitRetryLimit?: number
-  /** Used when a 429 answer carries no Retry-After. */
+  /** Used when a 429 answer carries no Retry-After. A free model shared by everyone can stay busy for minutes. */
   rateLimitDelayMs?: number
 }
 
@@ -38,7 +38,7 @@ const retryDelayOf = (response: Response, fallbackMs: number): number => {
  * @returns A fetch handler.
  */
 export const createHostedModelProxy = (options: HostedModelOptions): ((request: Request) => Promise<Response>) => {
-  const { baseUrl, apiKey, model, fetchFunction = fetch, rateLimitRetryLimit = 10, rateLimitDelayMs = 10_000 } = options
+  const { baseUrl, apiKey, model, fetchFunction = fetch, rateLimitRetryLimit = 60, rateLimitDelayMs = 10_000 } = options
 
   const sendChat = async (body: string, signal: AbortSignal, retriesLeft: number): Promise<Response> => {
     const response = await fetchFunction(`${baseUrl}/chat/completions`, {
