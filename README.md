@@ -380,6 +380,33 @@ OFFEE_E2E_FORM=~/Downloads/form.pdf pnpm e2e   # the same with any PDF
 `pnpm e2e` starts whichever of the two is not running. The report, with a screenshot of the
 review and the filled PDF, is in `playwright-report/`.
 
+Most form bugs need no model at all. `bin/offee-dev forms` reads each PDF the way Offee does before
+it asks one (decrypting it, reading its fields, or finding the labels of a form without fields)
+and prints OK or FAIL per file, in seconds:
+
+```sh
+bin/offee-dev forms ~/Downloads apps/web/public/samples
+```
+
+On this machine the local model takes most of an hour over a long form. A free hosted model
+answers in minutes: `bin/offee-dev hosted` serves one on the same port instead, through a proxy
+on the host that adds the key, so the key never reaches the app. Any OpenAI-compatible provider
+works, such as OpenRouter (`https://openrouter.ai/api/v1`, free models end in `:free`), Groq
+(`https://api.groq.com/openai/v1`) or Google AI Studio
+(`https://generativelanguage.googleapis.com/v1beta/openai`); take the model id from the
+provider's list. A free tier's rate limit is waited out.
+
+```sh
+export OFFEE_DEV_HOSTED_URL=https://api.groq.com/openai/v1
+export OFFEE_DEV_HOSTED_KEY=...      # your key for that provider
+export OFFEE_DEV_HOSTED_MODEL=...    # a model id from that provider
+pnpm e2e                             # now against the hosted model
+```
+
+A pass there shows the flow works, not that the local model is good enough: it is another
+model, and not every provider honours the JSON schema an answer must fit. Try the local model
+before release.
+
 Netlify builds one site from Git (`netlify.toml`): the project website at the root and the UI under
 `/demo/`, in **demo mode** (`VITE_DEMO_MODE=1`): sample profiles, documents and runs, and canned
 answers held in the browser tab, since no Offee server runs there. Its `ignore` rule skips a build

@@ -3,7 +3,8 @@ import { expect, test } from '@playwright/test'
 import { PDFCheckBox, PDFDocument, PDFTextField } from 'pdf-lib'
 
 // Any PDF can be tried, such as a form that failed for someone, before and after a fix.
-const formPath = process.env.OFFEE_E2E_FORM ?? 'apps/web/public/samples/tenant-self-disclosure.pdf'
+const sampleFormPath = 'apps/web/public/samples/tenant-self-disclosure.pdf'
+const formPath = process.env.OFFEE_E2E_FORM ?? sampleFormPath
 
 const profile = {
   label: 'End to end (fictional)',
@@ -53,4 +54,9 @@ test('fills a PDF form end to end with the local model', async ({ page, baseURL 
   const filledCount = fields.filter((field) => (field instanceof PDFTextField && (field.getText() ?? '') !== '') || (field instanceof PDFCheckBox && field.isChecked())).length
   test.info().annotations.push({ type: 'fields', description: `${filledCount} of ${fields.length} fields filled` })
   expect(filledCount).toBeGreaterThan(0)
+  // The profile alone fills most of the sample; only the model reads the date of birth out of the
+  // profile's facts, so without this a run whose model answers went unused would still pass.
+  if (formPath === sampleFormPath) {
+    expect((await PDFDocument.load(await readFile(filledPath))).getForm().getTextField('Date of birth').getText()).toBe('12.08.1984')
+  }
 })
