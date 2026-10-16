@@ -104,7 +104,8 @@ export const placedFieldSchema = z.object({
 export const formFillRequestSchema = z.object({
   formFileId: z.string().min(1),
   profileId: z.string().min(1),
-  values: z.array(fieldSuggestionSchema).max(2_000),
-  placedFields: z.array(placedFieldSchema).max(2_000),
+  // A complete income tax return has over 2,000 fields.
+  values: z.array(fieldSuggestionSchema).max(10_000),
+  placedFields: z.array(placedFieldSchema).max(10_000),
   sign: z.boolean(),
 })
