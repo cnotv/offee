@@ -172,10 +172,8 @@ On a Mac with Apple Silicon (macOS 13 or later, 16 GB of memory or more) with
 1. Download `Offee-arm64.dmg` from the
    [Mac preview release](https://github.com/cnotv/offee/releases/tag/mac-preview) and drag Offee to
    Applications.
-2. The app is not notarized yet, so the first time right-click it and choose **Open** (on
-   macOS 15: open it once, then allow it in System Settings, Privacy & Security).
-3. Choose **Set up Offee**. When setup finishes, Offee fills the window, under a bar with the
-   status, the switch and **Settings**.
+2. Open it and choose **Set up Offee**. When setup finishes, Offee fills the window, under a bar
+   with the status, the switch and **Settings**.
 
 ![The Mac app: Offee fills the window under a bar with its status, the switch and Settings](docs/media/desktop-one-window.png)
 
@@ -192,7 +190,7 @@ the Mac rather than from Offee. **Install update** downloads it, refuses it unle
 matches the one GitHub lists, replaces `/Applications/Offee.app` and restarts; the first start
 afterwards rebuilds the containers. An app that runs from elsewhere opens the disk image for
 you to drag over instead. The checksum proves the file is the one GitHub serves, not who built
-it: the app is not notarized.
+it: the update's signature is checked to be intact, not to be Offee's own.
 
 The bar and the settings are one page and Offee is another, in two views of the one window,
 never one inside the other. The view that shows Offee is a locked-down browser: no Node.js,
@@ -384,6 +382,18 @@ Netlify publishes the UI alone for every pull request, in **demo mode** (`VITE_D
 `netlify.toml`): sample profiles, documents and runs, and canned answers held in the browser tab,
 since no Offee server runs there. `VITE_DEMO_MODE=1 pnpm --filter @offee/web dev` runs the same
 locally. A build without it carries no demo code.
+
+The `Mac app` workflow signs Offee with a Developer ID and has Apple notarize the disk image when
+these repository secrets are set; without them (forks) the image is signed ad hoc and macOS asks
+before the first launch, as the release notes then say.
+
+| Secret | What |
+| --- | --- |
+| `MAC_CERTIFICATE_P12_BASE64` | The Developer ID Application certificate and its private key, exported from Keychain Access as a `.p12` and encoded with `base64 -i Offee.p12 -o Offee.txt` |
+| `MAC_CERTIFICATE_PASSWORD` | The password chosen when exporting that `.p12` |
+| `APPLE_ID` | The Apple Account of the developer team |
+| `APPLE_APP_SPECIFIC_PASSWORD` | An app-specific password for that account, made at [account.apple.com](https://account.apple.com) under Sign-In and Security |
+| `APPLE_TEAM_ID` | The ten character team ID in the [membership details](https://developer.apple.com/account#MembershipDetailsCard) |
 
 ## Status
 
