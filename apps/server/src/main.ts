@@ -84,6 +84,6 @@ const webRoot = relative(process.cwd(), settings.webDistDirectory)
 app.use('*', serveStatic({ root: webRoot }))
 app.get('*', serveStatic({ root: webRoot, rewriteRequestPath: () => '/index.html' }))
 
-serve({ fetch: app.fetch, hostname: '0.0.0.0', port: settings.port }, () => {
+serve({ fetch: app.fetch, hostname: settings.listenHost, port: settings.port }, () => {
   process.stdout.write(`offee: listening on ${settings.port}\n`)
 })
