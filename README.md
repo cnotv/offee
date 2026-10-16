@@ -72,6 +72,37 @@ needs a Mac with Apple Silicon or a Linux PC, and 16 GB of memory.
 | Translate           | a document and a target language          | the document translated, layout kept  |
 | Draft a reply       | an email (`.eml`, `.mbox`) or chat thread | a reply grounded in your knowledge    |
 
+### How filling a form works
+
+1. **Open the PDF.** It reaches Offee through the browser upload, like every file.
+2. **Find the fields.** A PDF with fillable fields is used as it is. A PDF drawn without them,
+   as many official German forms are, is read as text: words close together on a row become one
+   label. The local model gets the numbered labels and answers, for each label that takes an
+   answer, whether it is text or a box to tick and on which side of the label it goes. Text goes
+   to the right only when its label ends in a colon or dots. Offee then adds real form fields
+   there, named after their labels. A long form goes to the model in batches that fit its
+   16,000-token context: a complete income tax return, 2,101 fields, takes about 50 minutes on a
+   Mac. A scan with no text layer is not supported yet.
+3. **Fill from the profile, by rule.** Each field's name is compared with the aliases in
+   `config/form-field-aliases.json`: an exact alias wins, otherwise the longest alias the name
+   contains. Fields about a death, a birth, a spouse or a foreign address, a label repeated
+   further down (the second person's block of a tax return) and tick boxes are left to the next
+   step. A signature field is left to signing.
+4. **Fill the rest with the model.** The empty fields go to the persona's model with the
+   profile's facts and the passages of the profile's documents that match the field names. It
+   fills only what those say and leaves the rest empty. The model is the local one unless the
+   persona may go remote and the switch lets the request out.
+5. **Check every value.** The review table shows each field, its value and where it came from:
+   Profile, Model or Empty. Nothing is written until you save. On a form whose fields Offee
+   placed, a Where column moves a field to another side of its label; the fields are placed
+   again on every save.
+6. **Save.** Save filled writes the values and keeps the fields, so any PDF reader can still
+   change them. Save filled and signed also draws the profile's signature image, flattens the
+   form so the values cannot change, and signs it with the profile's certificate, created the
+   first time it is needed.
+
+Every model call is in the run log, with what was sent and which model answered.
+
 ## Isolation
 
 ![Offee runs in a Linux VM inside the Mac, in containers on an internal network; the gateway is the only way out and only the switch on the Mac opens it](docs/media/diagrams/how-it-fits.svg)
