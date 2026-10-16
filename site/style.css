@@ -221,6 +221,19 @@ figure.window figcaption {
   color: var(--muted);
 }
 
+/* Feature clips: one short loop per task, with a line under each instead of a paragraph. */
+.clips {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 26rem), 1fr));
+  gap: 1.25rem;
+}
+
+.clips figcaption strong {
+  display: block;
+  color: var(--ink);
+  font: 600 1.125rem var(--serif);
+}
+
 section {
   padding: 3.5rem 0;
   border-top: 1px solid var(--rule);

@@ -188,25 +188,55 @@
         </section>
 
         <section id="does">
-          <div class="prose">
-            <h2>What it does today</h2>
-            <h3>Fill and sign forms</h3>
-            <p>Open a PDF form and pick who you are filling it as. Offee fills in what it knows, you check each value, and it saves the PDF, signed if you want.</p>
-            <h3>Read a document into a profile</h3>
-            <p>Give it an ID, a CV or a scan of one, and your details land in a profile for you to check, ready for the next form.</p>
-            <h3>Reply to emails and chats</h3>
-            <p>Drop in a thread and say what you want to answer. You get a draft in your name and tone, based on your own documents.</p>
-            <h3>Translate</h3>
-            <p>A whole document, paragraph by paragraph, keeping the names, numbers and terms you care about.</p>
-            <h3>Sum up a meeting</h3>
-            <p>From notes or a recording: a summary, the decisions, and who does what by when.</p>
+          <h2>What it does today</h2>
+          <div class="clips">
+            <figure class="window">
+              <video data-clip muted loop playsinline controls preload="none" width="1280" height="800" poster="media/clips/profile.webp" aria-label="A scanned personal data sheet is read into a new profile.">
+                <source src="media/clips/profile.mp4" type="video/mp4">
+              </video>
+              <figcaption><strong>Read a document into a profile</strong> An ID, a CV or a scan: your details land in a profile for you to check.</figcaption>
+            </figure>
+            <figure class="window">
+              <video data-clip muted loop playsinline controls preload="none" width="1280" height="800" poster="media/clips/form.webp" aria-label="A tenant form is filled from the profile and saved as a PDF.">
+                <source src="media/clips/form.mp4" type="video/mp4">
+              </video>
+              <figcaption><strong>Fill and sign forms</strong> Pick who you are; Offee fills the PDF, you check each value, it saves and signs.</figcaption>
+            </figure>
+            <figure class="window">
+              <video data-clip muted loop playsinline controls preload="none" width="1280" height="800" poster="media/clips/reply.webp" aria-label="A reply to a meeting invitation is drafted from one line of instructions.">
+                <source src="media/clips/reply.mp4" type="video/mp4">
+              </video>
+              <figcaption><strong>Reply to emails and chats</strong> A draft in your name and tone, based on your own documents.</figcaption>
+            </figure>
+            <figure class="window">
+              <video data-clip muted loop playsinline controls preload="none" width="1280" height="800" poster="media/clips/translate.webp" aria-label="A short English letter is translated into German.">
+                <source src="media/clips/translate.mp4" type="video/mp4">
+              </video>
+              <figcaption><strong>Translate</strong> A whole document, keeping the names, numbers and terms you care about.</figcaption>
+            </figure>
+            <figure class="window">
+              <video data-clip muted loop playsinline controls preload="none" width="1280" height="800" poster="media/clips/review.webp" aria-label="Meeting notes become a summary with decisions and action items.">
+                <source src="media/clips/review.mp4" type="video/mp4">
+              </video>
+              <figcaption><strong>Sum up a meeting</strong> From notes or a recording: a summary, the decisions, who does what.</figcaption>
+            </figure>
+            <figure class="window">
+              <video data-clip muted loop playsinline controls preload="none" width="1280" height="800" poster="media/clips/run-log.webp" aria-label="A run in the log shows its input, its output and that nothing left the machine.">
+                <source src="media/clips/run-log.mp4" type="video/mp4">
+              </video>
+              <figcaption><strong>See what it did</strong> Every task is logged: what went in, which AI answered, whether anything left.</figcaption>
+            </figure>
           </div>
-          <figure class="window" style="max-width: 52rem; margin-top: 2rem">
-            <video controls preload="none" width="1280" height="800" poster="media/offee-features.png">
-              <source src="media/offee-features.mp4" type="video/mp4">
-            </video>
-            <figcaption>A 70 second tour of every page, recorded against a stand-in model, so the answers there are canned.</figcaption>
-          </figure>
+          <script>
+            // Each clip plays while it is on screen, unless the visitor asked for less motion; the controls pause it.
+            if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
+              const observer = new IntersectionObserver((entries) =>
+                entries.forEach((entry) => (entry.isIntersecting ? entry.target.play().catch(() => {}) : entry.target.pause())),
+              { threshold: 0.6 })
+              document.querySelectorAll('video[data-clip]').forEach((video) => observer.observe(video))
+            }
+          </script>
+          <p class="small">The first two clips use the real local model, twice as fast, with its waits cut. The others use a stand-in model, so their answers are canned.</p>
         </section>
 
         <section id="get">
