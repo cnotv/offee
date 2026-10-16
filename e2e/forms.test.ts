@@ -41,8 +41,11 @@ test('fills a PDF form end to end with the local model', async ({ page, baseURL 
   await test.info().attach('review', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' })
 
   await page.getByRole('button', { name: 'Save filled', exact: true }).click()
+  const downloadLink = page.getByRole('link', { name: 'Download the PDF' })
+  await expect(downloadLink.or(page.getByRole('alert'))).toBeVisible({ timeout: 5 * 60_000 })
+  expect(await page.getByRole('alert').isVisible() ? await page.getByRole('alert').innerText() : '', 'Offee showed an error instead of the saved PDF').toBe('')
   const download = page.waitForEvent('download')
-  await page.getByRole('link', { name: 'Download the PDF' }).click({ timeout: 5 * 60_000 })
+  await downloadLink.click()
   const filledPath = await (await download).path()
   await test.info().attach('filled.pdf', { path: filledPath, contentType: 'application/pdf' })
 
