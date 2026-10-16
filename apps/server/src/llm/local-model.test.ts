@@ -29,7 +29,7 @@ describe('the local model', () => {
     const { fetchFunction, calls } = fetchAnswering([() => streamed(['<think>plan</think>', 'Hel', 'lo ', 'there'])])
     const model = createLocalModel('http://inference:8080', fetchFunction)
     expect(await model.complete(request)).toBe('Hello there')
-    expect(calls.bodies[0]).toMatchObject({ stream: true })
+    expect(calls.bodies[0]).toMatchObject({ stream: true, chat_template_kwargs: { enable_thinking: false } })
   })
 
   it('waits while the model is still loading, then answers', async () => {

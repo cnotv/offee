@@ -68,6 +68,10 @@ export const createLocalModel = (baseUrl: string, fetchFunction: typeof fetch = 
         // Streamed, the headers come at once: fetch drops a response whose headers take more than
         // five minutes, and a long answer on a slow machine takes longer than that to write.
         stream: true,
+        // Gemma thinks before a long task, out of sight in reasoning_content, and spent the whole
+        // token budget there on a form's labels, leaving the answer empty. Offee's tasks are
+        // short readings and drafts, so the model answers straight away.
+        chat_template_kwargs: { enable_thinking: false },
         // An answer that must fit a schema is data read off a document: the likeliest reading, every time.
         temperature: request.jsonSchema === undefined ? 0.3 : 0,
         ...(request.jsonSchema === undefined
