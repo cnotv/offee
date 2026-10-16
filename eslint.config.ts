@@ -22,7 +22,7 @@ const functionalStyle = {
 
 export default typescript.config(
   {
-    ignores: ['**/dist/**', '**/node_modules/**', '**/build/**'],
+    ignores: ['**/dist/**', '**/node_modules/**', '**/build/**', 'playwright-report/**', 'test-results/**', '.data-dev/**'],
   },
   javascript.configs.recommended,
   ...typescript.configs.recommended,
