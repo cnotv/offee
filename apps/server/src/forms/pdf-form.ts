@@ -1,3 +1,4 @@
+import { PDFDocument as DecryptingDocument } from '@cantoo/pdf-lib'
 import { PDFCheckBox, PDFDocument, PDFDropdown, PDFOptionList, PDFRadioGroup, PDFSignature, PDFTextField } from 'pdf-lib'
 import type { PDFField } from 'pdf-lib'
 import { pdflibAddPlaceholder } from '@signpdf/placeholder-pdf-lib'
@@ -19,6 +20,21 @@ const kindOf = (field: PDFField): FormFieldKind => {
 const optionsOf = (field: PDFField): string[] => {
   if (field instanceof PDFDropdown || field instanceof PDFOptionList || field instanceof PDFRadioGroup) return field.getOptions()
   return []
+}
+
+/**
+ * Unlocks a PDF that is encrypted only against editing, as many official forms are: any reader
+ * opens them with no password, but pdf-lib cannot read an encrypted file at all. The pdf-lib
+ * fork that can decrypt is used for this step alone, so filling and signing stay on pdf-lib.
+ * @param content The PDF as uploaded.
+ * @param fileName Its name, for the message when it needs a password to open.
+ * @returns The same bytes when the PDF is not encrypted, otherwise an unlocked copy.
+ */
+export const withoutEncryption = async (content: Uint8Array, fileName: string): Promise<Uint8Array> => {
+  if (!(await PDFDocument.load(content, { ignoreEncryption: true })).isEncrypted) return content
+  const unlocked = await DecryptingDocument.load(content, { password: '' }).catch(() => null)
+  if (unlocked === null) throw new Error(`${fileName} needs a password to open. Open it in a PDF reader, save a copy without the password, and open that here.`)
+  return unlocked.save()
 }
 
 /**

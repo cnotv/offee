@@ -1,10 +1,11 @@
+import { PDFDocument as EncryptingDocument } from '@cantoo/pdf-lib'
 import { PDFDocument } from 'pdf-lib'
 import { describe, expect, it } from 'vitest'
 import type { Profile } from '@offee/contracts'
 import { createSigningCertificate } from './certificate.ts'
 import shippedAliasesFile from '../../../../config/form-field-aliases.json' with { type: 'json' }
 import { fieldAliasesSchema, matchFieldToKey, normalizeFieldName, suggestFromProfile } from './match-fields.ts'
-import { fillForm, readFormFields } from './pdf-form.ts'
+import { fillForm, readFormFields, withoutEncryption } from './pdf-form.ts'
 
 const aliases = {
   fullName: ['fullname', 'name'],
@@ -129,4 +130,31 @@ describe('filling and signing a PDF form', () => {
     expect(signedText).toContain('/ETSI.CAdES.detached')
     expect(signedText).not.toMatch(/\/Contents\s*<0+>/)
   }, 30_000)
+})
+
+// Official forms often come locked against editing: any reader opens them, no editor changes them.
+const makeLockedForm = async (userPassword: string): Promise<Uint8Array> => {
+  const document = await EncryptingDocument.create()
+  const page = document.addPage([600, 400])
+  document.getForm().createTextField('Name').addToPage(page, { x: 50, y: 300, width: 200, height: 20 })
+  document.encrypt({ ownerPassword: 'only-the-office-knows', userPassword })
+  return document.save()
+}
+
+describe('a PDF form locked against editing', () => {
+  it('is unlocked, so its fields can be read and filled', async () => {
+    const unlocked = await withoutEncryption(await makeLockedForm(''), 'locked.pdf')
+    expect((await readFormFields(unlocked)).map((field) => field.name)).toEqual(['Name'])
+    const filled = await fillForm(unlocked, { values: [{ name: 'Name', value: 'Ada Lovelace', source: 'profile' }], sign: null })
+    expect((await PDFDocument.load(filled)).getForm().getTextField('Name').getText()).toBe('Ada Lovelace')
+  })
+
+  it('leaves a PDF that is not locked as it is', async () => {
+    const plain = await makeForm()
+    expect(await withoutEncryption(plain, 'plain.pdf')).toBe(plain)
+  })
+
+  it('says so plainly when the PDF needs a password to open', async () => {
+    await expect(withoutEncryption(await makeLockedForm('secret'), 'private.pdf')).rejects.toThrow('private.pdf needs a password to open')
+  })
 })

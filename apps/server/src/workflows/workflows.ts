@@ -20,7 +20,7 @@ import type { FieldAliases } from '../forms/match-fields.ts'
 import { suggestFromProfile } from '../forms/match-fields.ts'
 import type { TextLine } from '../forms/flat-form.ts'
 import { addPlacedFields, fieldPlacementSchema, fieldPlacementsFromModelAnswer, readTextLines, usablePlacedFields } from '../forms/flat-form.ts'
-import { fillForm, readFormFields } from '../forms/pdf-form.ts'
+import { fillForm, readFormFields, withoutEncryption } from '../forms/pdf-form.ts'
 import { chunkText } from '../knowledge/chunk-text.ts'
 import type { Generation, Models } from '../llm/generate.ts'
 import { generate } from '../llm/generate.ts'
@@ -232,9 +232,11 @@ export const createWorkflows = (dependencies: WorkflowDependencies) => {
 
     inspectForm: async (upload: { name: string; content: Uint8Array }, context: WorkflowContext, signal: AbortSignal): Promise<FormInspection> => {
       const { profile, persona } = resolve(context)
-      const placedFields = await placeFields(upload, persona, signal)
-      const fields = await readFormFields(await withPlacedFields(upload.content, placedFields))
-      const formFileId = dependencies.files.put({ name: upload.name, mimeType: 'application/pdf', content: upload.content })
+      // Kept unlocked, so placing fields, filling and signing all read the same copy.
+      const form = { name: upload.name, content: await withoutEncryption(upload.content, upload.name) }
+      const placedFields = await placeFields(form, persona, signal)
+      const fields = await readFormFields(await withPlacedFields(form.content, placedFields))
+      const formFileId = dependencies.files.put({ name: form.name, mimeType: 'application/pdf', content: form.content })
       const today = new Date(dependencies.now()).toLocaleDateString('en-GB')
       const fromProfile = profile === undefined ? fields.map((field) => ({ name: field.name, value: '', source: 'none' as const })) : suggestFromProfile(fields, profile, dependencies.fieldAliases, today)
       const unanswered = fields.filter(
