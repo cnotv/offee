@@ -39,7 +39,7 @@ const router = createBrowserRouter([
       { path: 'data', element: <DataView />, handle: { title: 'Stored data' } },
     ],
   },
-])
+], { basename: import.meta.env.BASE_URL })
 
 const SystemTheme = ({ children }: { children: ReactNode }) => (
   <Theme appearance={useColorScheme()} accentColor="indigo" grayColor="slate" radius="large" panelBackground="translucent">
