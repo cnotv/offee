@@ -380,9 +380,12 @@ OFFEE_E2E_FORM=~/Downloads/form.pdf pnpm e2e   # the same with any PDF
 `pnpm e2e` starts whichever of the two is not running. The report, with a screenshot of the
 review and the filled PDF, is in `playwright-report/`.
 
-Netlify publishes the UI alone for every pull request, in **demo mode** (`VITE_DEMO_MODE=1`, set in
-`netlify.toml`): sample profiles, documents and runs, and canned answers held in the browser tab,
-since no Offee server runs there. `VITE_DEMO_MODE=1 pnpm --filter @offee/web dev` runs the same
+Netlify builds one site from Git (`netlify.toml`): the project website at the root and the UI under
+`/demo/`, in **demo mode** (`VITE_DEMO_MODE=1`): sample profiles, documents and runs, and canned
+answers held in the browser tab, since no Offee server runs there. Its `ignore` rule skips a build
+unless the change touches the website (`site/`, `docs/media/`) or what the UI is built from; every
+build carries both parts, since a deploy replaces the whole site. GitHub Pages stays the website's
+production home, published by `pages.yml` for website changes only. `VITE_DEMO_MODE=1 pnpm --filter @offee/web dev` runs the same
 locally. A build without it carries no demo code.
 
 ## Status
