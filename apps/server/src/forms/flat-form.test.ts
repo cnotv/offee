@@ -29,22 +29,17 @@ describe('filling a form that has no fields', () => {
     ])
   })
 
-  it('keeps only placements on lines that exist, and gives repeated labels their own names', async () => {
+  it('names each field after its label, keeps only real lines, and reads an answer cut off at its limit', async () => {
     const lines = await readTextLines(await makeFlatForm())
-    const answer = JSON.stringify({
-      fields: [
-        { line: 1, name: 'Familienname', kind: 'text', position: 'below' },
-        { line: 2, name: 'Familienname', kind: 'text', position: 'sideways' },
-        { line: 99, name: 'Invented', kind: 'text', position: 'below' },
-        { line: 4, name: 'leibliches Kind', kind: 'checkbox', position: 'left' },
-      ],
-    })
-    expect(fieldPlacementsFromModelAnswer(`Here you go: ${answer}`, lines)).toEqual([
+    const cutOff = 'Here you go: {"fields": ["1 text right", "1 text below", "99 text below", "3 text sideways", "3 text below", "4 checkbox left", "2 text be'
+    expect(fieldPlacementsFromModelAnswer(cutOff, lines)).toEqual([
       { line: 1, name: 'Familienname', kind: 'text', position: 'below' },
-      { line: 2, name: 'Familienname 2', kind: 'text', position: 'below' },
+      { line: 1, name: 'Familienname 2', kind: 'text', position: 'below' },
+      // "Geburtsdatum:" ends in a colon, so its answer follows on the line whatever the model said.
+      { line: 3, name: 'Geburtsdatum', kind: 'text', position: 'right' },
       { line: 4, name: 'leibliches Kind', kind: 'checkbox', position: 'left' },
     ])
-    expect(fieldPlacementsFromModelAnswer('no JSON here', lines)).toEqual([])
+    expect(fieldPlacementsFromModelAnswer('no fields here', lines)).toEqual([])
   })
 
   it('adds real fields where they were placed, which the usual flow then fills', async () => {
