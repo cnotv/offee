@@ -21,7 +21,12 @@ export const formSchemaFor = (fields: FormField[]): Record<string, unknown> => (
   required: ['fields'],
 })
 
-const answerSchema = z.object({ fields: z.array(z.object({ name: z.string(), value: z.string() })) })
+// A model held to the schema lists name and value pairs; one that is not, such as a hosted model
+// whose provider ignores the schema, names each field as a key.
+const answerSchema = z.union([
+  z.object({ fields: z.array(z.object({ name: z.string(), value: z.string() })) }),
+  z.record(z.string(), z.string()).transform((values) => ({ fields: Object.entries(values).map(([name, value]) => ({ name, value })) })),
+])
 
 /**
  * Finds the JSON object in a model's answer, which a remote model may wrap in prose or a fence.
